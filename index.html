@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตะกร้อ สกอร์บอร์ด Pro</title>
+    <title>ตะกร้อ สกอร์บอร์ด Pro + Team Logo</title>
     <style>
-        /* --- ส่วนของ CSS (ตกแต่งหน้าตา) --- */
         :root {
-            --bg-color: #0d1b15; /* เขียวเข้มสไตล์สนาม */
+            --bg-color: #0d1b15; 
             --card-bg: #162a22;
             --gold: #ffd700;
-            --team-a-color: #e63946; /* สีแดง */
-            --team-b-color: #1d3557; /* สีน้ำเงิน */
+            --team-a-color: #e63946; 
+            --team-b-color: #1d3557; 
             --text-light: #f8f9fa;
         }
 
@@ -67,18 +66,52 @@
             border-radius: 18px;
             border-bottom: 5px solid #444;
             transition: transform 0.1s;
-        }
-
-        .team-box:active {
-            transform: scale(0.98);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         #teamA-box { border-bottom-color: var(--team-a-color); }
         #teamB-box { border-bottom-color: var(--team-b-color); }
 
+        /* ส่วนแสดงผลโลโก้ทีม */
+        .logo-container {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .team-logo {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #555;
+            background-color: #222;
+        }
+
+        /* ปุ่มอัปโหลดแบบซ่อนตัวหนังสือ */
+        .file-input {
+            display: none;
+        }
+
+        .edit-badge {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: var(--gold);
+            color: black;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
         h2 {
             margin: 0;
-            font-size: 18px;
+            font-size: 16px;
             color: #ccc;
         }
 
@@ -86,19 +119,19 @@
         #teamB-box h2 { color: #75aadb; }
 
         .score {
-            font-size: 90px;
+            font-size: 80px;
             font-weight: 800;
             line-height: 1;
-            margin: 20px 0;
+            margin: 15px 0;
             font-family: monospace;
             text-shadow: 0 0 10px rgba(255,255,255,0.1);
         }
 
-        /* ปุ่มกดขนาดใหญ่สะใจ */
         .btn-zone {
             display: flex;
             flex-direction: column;
             gap: 10px;
+            width: 90%;
         }
 
         .btn {
@@ -112,8 +145,8 @@
         }
 
         .btn-add {
-            padding: 18px;
-            font-size: 20px;
+            padding: 16px;
+            font-size: 18px;
             color: white;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
@@ -125,7 +158,7 @@
             background: #333;
             color: #bbb;
             padding: 8px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .btn-sub:hover { background: #444; color: #fff; }
@@ -147,7 +180,6 @@
             border-color: #dc3545;
         }
 
-        /* หน้าจอแจ้งเตือนผู้ชนะแบบสวยๆ */
         .overlay {
             display: none;
             position: fixed;
@@ -164,12 +196,6 @@
             border-radius: 20px;
             border: 3px solid var(--gold);
             text-align: center;
-            animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popUp {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
         }
 
         .winner-title {
@@ -183,11 +209,18 @@
 
     <div class="container">
         <h1>SEPAK TAKRAW</h1>
-        <div class="subtitle">กติกาดิวส์สูงสุดไม่เกิน 25 คะแนน</div>
+        <div class="subtitle">คลิกที่รูปวงกลมเพื่อตั้งค่า/เปลี่ยนโลโก้ทีม</div>
         
         <div class="scoreboard">
             <!-- ฝั่งทีม A -->
             <div class="team-box" id="teamA-box">
+                <!-- ส่วนคลิกเลือกไฟล์รูป -->
+                <label class="logo-container" for="uploadA">
+                    <img id="logoA" class="team-logo" src="https://cdn-icons-png.flaticon.com/512/5323/5323861.png" alt="Logo A">
+                    <span class="edit-badge">เปลี่ยน</span>
+                </label>
+                <input type="file" id="uploadA" class="file-input" accept="image/*" onchange="previewImage(event, 'logoA')">
+                
                 <h2>TEAM A</h2>
                 <div class="score" id="scoreA">0</div>
                 <div class="btn-zone">
@@ -198,6 +231,13 @@
 
             <!-- ฝั่งทีม B -->
             <div class="team-box" id="teamB-box">
+                <!-- ส่วนคลิกเลือกไฟล์รูป -->
+                <label class="logo-container" for="uploadB">
+                    <img id="logoB" class="team-logo" src="https://cdn-icons-png.flaticon.com/512/5323/5323861.png" alt="Logo B">
+                    <span class="edit-badge">เปลี่ยน</span>
+                </label>
+                <input type="file" id="uploadB" class="file-input" accept="image/*" onchange="previewImage(event, 'logoB')">
+
                 <h2>TEAM B</h2>
                 <div class="score" id="scoreB">0</div>
                 <div class="btn-zone">
@@ -210,7 +250,6 @@
         <button class="btn btn-reset" onclick="resetScore()">RESET GAME (เริ่มใหม่)</button>
     </div>
 
-    <!-- ส่วนป๊อปอัพแจ้งผู้ชนะ -->
     <div class="overlay" id="winnerOverlay">
         <div class="winner-card">
             <div class="winner-title" id="winnerText">🎉 TEAM A WIN!</div>
@@ -219,14 +258,24 @@
     </div>
 
     <script>
-        /* --- ส่วนของ JavaScript (ระบบคำนวณ) --- */
         let scoreA = 0;
         let scoreB = 0;
         let gameOver = false;
 
+        // ระบบเปลี่ยนไฟล์รูปภาพไอคอนทีม
+        function previewImage(event, imageId) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const output = document.getElementById(imageId);
+                output.src = reader.result;
+            };
+            if(event.target.files[0]) {
+                reader.readAsDataURL(event.target.files[0]);
+            }
+        }
+
         function addScore(team) {
             if (gameOver) return;
-
             if (team === 'A') {
                 scoreA++;
                 document.getElementById('scoreA').innerText = scoreA;
@@ -234,13 +283,11 @@
                 scoreB++;
                 document.getElementById('scoreB').innerText = scoreB;
             }
-
             checkWinner();
         }
 
         function subScore(team) {
             if (gameOver) return;
-
             if (team === 'A' && scoreA > 0) {
                 scoreA--;
                 document.getElementById('scoreA').innerText = scoreA;
@@ -251,8 +298,6 @@
         }
 
         function checkWinner() {
-            // กติกากีฬาเซปักตะกร้อ: ชนะที่ 21 คะแนน 
-            // หากดิวส์ (20-20) ต้องนำห่าง 2 แต้ม แต่สูงสุดไม่เกิน 25 คะแนน
             if (scoreA >= 21 || scoreB >= 21) {
                 if (Math.abs(scoreA - scoreB) >= 2 || scoreA === 25 || scoreB === 25) {
                     gameOver = true;
