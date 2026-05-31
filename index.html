@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตะกร้อ สกอร์บอร์ด Pro - พร้อมระบบบันทึกประวัติการแข่ง</title>
+    <title>ตะกร้อ สกอร์บอร์ด Pro - เวอร์ชันเสถียรสูงสุด</title>
     <style>
         :root {
             --bg-color: #0d1b15; 
@@ -149,7 +149,7 @@
         .btn-clear-history:hover { background: #dc3545; color: white; }
 
         .history-list {
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -169,6 +169,11 @@
         .history-item.win-left { border-left-color: var(--team-a-color); }
         .history-item.win-right { border-left-color: var(--team-b-color); }
 
+        .tag-set {
+            background: var(--gold); color: #000; padding: 2px 6px; 
+            border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px;
+        }
+
         .no-history { color: #668073; font-size: 13px; text-align: center; padding: 15px 0; width: 100%; }
 
         /* หน้าต่างป๊อปอัป */
@@ -184,7 +189,6 @@
 </head>
 <body>
 
-    <!-- บล็อกหลัก: สกอร์บอร์ด -->
     <div class="container">
         <h1>SEPAK TAKRAW</h1>
         
@@ -236,19 +240,18 @@
         </div>
     </div>
 
-    <!-- บล็อกรอง: ประวัติการแข่งขันย้อนหลัง -->
+    <!-- โซนประวัติการแข่งขันย้อนหลัง -->
     <div class="history-container">
         <div class="history-header">
-            <h3 class="history-title">📜 ประวัติการแข่งขันแมตช์ล่าสุด</h3>
+            <h3 class="history-title">📜 ประวัติการบันทึกคะแนน (รายเซ็ต)</h3>
             <button class="btn-clear-history" onclick="clearMatchHistory()">ล้างประวัติทั้งหมด</button>
         </div>
         <div id="historyList" class="history-list">
-            <!-- ข้อมูลประวัติจะถูกเพิ่มเข้ามาตรงนี้ผ่าน Javascript -->
             <div class="no-history">ยังไม่มีประวัติการแข่งขันในเครื่องนี้</div>
         </div>
     </div>
 
-    <!-- หน้าต่างป๊อปอัปเลือกไอคอน -->
+    <!-- หน้าต่างตั้งค่าไอคอน -->
     <div class="overlay" id="settingsOverlay">
         <div class="modal-card">
             <div class="modal-title" id="settingsTitle">ตั้งค่าไอคอนทีม</div>
@@ -279,16 +282,24 @@
     <script>
         let scoreA = 0, scoreB = 0;
         let setsWonA = 0, setsWonB = 0;
+        let currentSetNumber = 1;
         let targetScore = 21;
         let gameOver = false, matchOver = false;
         let currentEditingTeam = '';
+        
+        // ใช้ Array ในการจำประวัติในรอบการเปิดแอปนั้นๆ เป็นหลัก เพื่อไม่ให้ง้อระบบเครื่อง
+        let memoryHistory = [];
 
-        // ตัวคอยติดตามชื่อดั้งเดิมเพื่อบันทึกลงประวัติอย่างถูกต้องแม้ว่าจะสลับฝั่ง
-        let teamConfigA = { name: "TEAM A", icon: "🔴" };
-        let teamConfigB = { name: "TEAM B", icon: "🔵" };
-
-        // โหลดประวัติการแข่งขันเก่าทันทีเมื่อเปิดแอป
         window.onload = function() {
+            // ดึงข้อมูลเก่าจากเครื่องมาใส่ใน Memory (ถ้ามีสิทธิ์เข้าถึง)
+            try {
+                let saved = localStorage.getItem('takraw_history_v3');
+                if (saved) {
+                    memoryHistory = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.log("LocalStorage บล็อกการเข้าถึง");
+            }
             renderHistory();
         };
 
@@ -308,10 +319,8 @@
         function selectEmoji(emoji) {
             if (currentEditingTeam === 'A') {
                 document.getElementById('displayA').innerText = emoji;
-                teamConfigA.icon = emoji;
             } else {
                 document.getElementById('displayB').innerText = emoji;
-                teamConfigB.icon = emoji;
             }
             closeSettings();
         }
@@ -344,6 +353,7 @@
             if (scoreA >= targetScore || scoreB >= targetScore) {
                 if (Math.abs(scoreA - scoreB) >= 2 || scoreA === maxDeuceScore || scoreB === maxDeuceScore) {
                     gameOver = true;
+                    
                     if (scoreA > scoreB) {
                         setsWonA++;
                         updateSetDots('A', setsWonA);
@@ -351,6 +361,10 @@
                         setsWonB++;
                         updateSetDots('B', setsWonB);
                     }
+
+                    // บันทึกทันที
+                    saveSetResult();
+
                     checkMatchWinner();
                 }
             }
@@ -367,25 +381,23 @@
         }
 
         function checkMatchWinner() {
-            let iconA = document.getElementById('displayA').innerText;
-            let iconB = document.getElementById('displayB').innerText;
-            let nameA = document.getElementById('nameA').innerText;
-            let nameB = document.getElementById('nameB').innerText;
+            let iconA = document.getElementById('displayA').innerText || "🔴";
+            let iconB = document.getElementById('displayB').innerText || "🔵";
+            let nameA = document.getElementById('nameA').innerText || "TEAM A";
+            let nameB = document.getElementById('nameB').innerText || "TEAM B";
 
             if (setsWonA === 2) {
                 matchOver = true;
-                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconA} ${nameA} ชนะการแข่งขัน ${setsWonA}-${setsWonB} เซต!`;
-                document.getElementById('winnerBtn').innerText = `บันทึกผล & เริ่มเกมใหม่`;
-                saveMatchResult(nameA, iconA, setsWonA, nameB, iconB, setsWonB, 'left');
+                document.getElementById('winnerText').innerText = `🏆 จบการแข่งขัน! ${iconA} ${nameA} ชนะแมตช์นี้รวม ${setsWonA}-${setsWonB} เซต`;
+                document.getElementById('winnerBtn').innerText = `เคลียร์กระดานเพื่อเริ่มแมตช์ใหม่`;
             } else if (setsWonB === 2) {
                 matchOver = true;
-                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconB} ${nameB} ชนะการแข่งขัน ${setsWonB}-${setsWonA} เซต!`;
-                document.getElementById('winnerBtn').innerText = `บันทึกผล & เริ่มเกมใหม่`;
-                saveMatchResult(nameA, iconA, setsWonA, nameB, iconB, setsWonB, 'right');
+                document.getElementById('winnerText').innerText = `🏆 จบการแข่งขัน! ${iconB} ${nameB} ชนะแมตช์นี้รวม ${setsWonB}-${setsWonA} เซต`;
+                document.getElementById('winnerBtn').innerText = `เคลียร์กระดานเพื่อเริ่มแมตช์ใหม่`;
             } else {
                 let currentWinner = scoreA > scoreB ? `${iconA} ${nameA}` : `${iconB} ${nameB}`;
-                document.getElementById('winnerText').innerText = `🎉 เซตนี้จบแล้ว! ${currentWinner} ชนะในเซตนี้`;
-                document.getElementById('winnerBtn').innerText = `เข้าสู่เซตถัดไป`;
+                document.getElementById('winnerText').innerText = `🎉 จบเซตที่ ${currentSetNumber}! ${currentWinner} ชนะเซตนี้ด้วยคะแนน ${scoreA}-${scoreB}`;
+                document.getElementById('winnerBtn').innerText = `ไปต่อเซตถัดไป`;
             }
             document.getElementById('winnerOverlay').style.display = 'flex';
         }
@@ -395,51 +407,60 @@
             if (matchOver) {
                 resetFullMatch();
             } else {
+                currentSetNumber++;
                 resetCurrentSet();
             }
         }
 
-        // ระบบบันทึกประวัติลงฐานข้อมูลจำลองในเครื่อง (LocalStorage)
-        function saveMatchResult(nameA, iconA, setA, nameB, iconB, setB, winnerSide) {
-            let history = JSON.parse(localStorage.getItem('takraw_history')) || [];
+        function saveSetResult() {
+            let iconA = document.getElementById('displayA').innerText || "🔴";
+            let iconB = document.getElementById('displayB').innerText || "🔵";
+            let nameA = document.getElementById('nameA').innerText || "TEAM A";
+            let nameB = document.getElementById('nameB').innerText || "TEAM B";
+
+            let winnerSide = scoreA > scoreB ? 'left' : 'right';
             
-            // สร้างข้อมูลแมตช์ปัจจุบัน
-            let matchData = {
+            let setData = {
+                setNo: currentSetNumber,
                 teamA: `${iconA} ${nameA}`,
                 teamB: `${iconB} ${nameB}`,
-                scoreA: setA,
-                scoreB: setB,
-                winner: winnerSide === 'left' ? `${iconA} ${nameA}` : `${iconB} ${nameB}`,
+                scoreA: scoreA,
+                scoreB: scoreB,
                 sideClass: winnerSide === 'left' ? 'win-left' : 'win-right',
                 time: new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})
             };
 
-            // บันทึกอันล่าสุดไว้บนสุด
-            history.unshift(matchData);
-            localStorage.setItem('takraw_history', JSON.stringify(history));
+            // ใส่เข้าไปในตัวแปรหลักบนแรมเครื่องทันทีเพื่อให้ทำงานได้แน่นอน 100%
+            memoryHistory.unshift(setData);
+
+            // พยายามพ่วงบันทึกลงตัวเครื่องเก็บไว้ด้วยถ้าไม่มีอะไรบล็อก
+            try {
+                localStorage.setItem('takraw_history_v3', JSON.stringify(memoryHistory));
+            } catch (e) {
+                console.log("เขียนลงเครื่องล้มเหลว แต่เก็บในแรมเรียบร้อย");
+            }
+            
             renderHistory();
         }
 
-        // ฟังก์ชันวาดประวัติการแข่งขันออกมาบนหน้าจอ
         function renderHistory() {
-            let history = JSON.parse(localStorage.getItem('takraw_history')) || [];
             let historyList = document.getElementById('historyList');
             
-            if (history.length === 0) {
+            if (memoryHistory.length === 0) {
                 historyList.innerHTML = '<div class="no-history">ยังไม่มีประวัติการแข่งขันในเครื่องนี้</div>';
                 return;
             }
 
             let html = '';
-            history.forEach(match => {
+            memoryHistory.forEach(item => {
                 html += `
-                    <div class="history-item ${match.sideClass}">
+                    <div class="history-item ${item.sideClass}">
                         <div>
-                            <strong>${match.teamA}</strong> vs <strong>${match.teamB}</strong>
-                            <div style="font-size: 10px; color: #668073; margin-top: 2px;">เวลา ${match.time} น.</div>
+                            <strong>${item.teamA}</strong> vs <strong>${item.teamB}</strong> <span class="tag-set">เซตที่ ${item.setNo}</span>
+                            <div style="font-size: 10px; color: #668073; margin-top: 2px;">เวลาบันทึก ${item.time} น.</div>
                         </div>
-                        <div style="font-size: 16px; font-weight: bold; color: var(--gold);">
-                            ${match.scoreA} - ${match.scoreB}
+                        <div style="font-size: 18px; font-weight: bold; color: var(--gold); font-family: monospace;">
+                            ${item.scoreA} - ${item.scoreB}
                         </div>
                     </div>
                 `;
@@ -447,10 +468,12 @@
             historyList.innerHTML = html;
         }
 
-        // ล้างประวัติการแข่งขันทั้งหมด
         function clearMatchHistory() {
-            if(confirm("คุณต้องการล้างประวัติการแข่งขันทั้งหมดใช่หรือไม่?")) {
-                localStorage.removeItem('takraw_history');
+            if(confirm("คุณต้องการล้างประวัติคะแนนเซตทั้งหมดใช่หรือไม่?")) {
+                memoryHistory = [];
+                try {
+                    localStorage.removeItem('takraw_history_v3');
+                } catch(e) {}
                 renderHistory();
             }
         }
@@ -462,7 +485,7 @@
         }
 
         function resetFullMatch() {
-            setsWonA = 0; setsWonB = 0; matchOver = false;
+            setsWonA = 0; setsWonB = 0; matchOver = false; currentSetNumber = 1;
             document.getElementById('setA-1').classList.remove('active');
             document.getElementById('setA-2').classList.remove('active');
             document.getElementById('setB-1').classList.remove('active');
