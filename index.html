@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตะกร้อ สกอร์บอร์ด Pro - Match Mode (2 ใน 3 เซต)</title>
+    <title>ตะกร้อ สกอร์บอร์ด Pro - พร้อมระบบบันทึกประวัติการแข่ง</title>
     <style>
         :root {
             --bg-color: #0d1b15; 
@@ -21,7 +21,7 @@
             margin: 0;
             padding: 10px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
             box-sizing: border-box;
@@ -37,6 +37,7 @@
             border: 2px solid #234235;
             text-align: center;
             position: relative;
+            margin-bottom: 20px;
         }
 
         h1 {
@@ -48,7 +49,6 @@
             letter-spacing: 1px;
         }
 
-        /* โซนตั้งค่าคะแนนสูงสุด */
         .config-zone {
             display: flex;
             justify-content: center;
@@ -59,21 +59,10 @@
             border-radius: 12px;
         }
 
-        .config-label {
-            font-size: 13px;
-            color: #8da499;
-            align-self: center;
-        }
-
+        .config-label { font-size: 13px; color: #8da499; align-self: center; }
         .select-custom {
-            background: #222;
-            color: var(--gold);
-            border: 1px solid #444;
-            padding: 5px 10px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-weight: bold;
-            cursor: pointer;
+            background: #222; color: var(--gold); border: 1px solid #444;
+            padding: 5px 10px; border-radius: 8px; font-family: inherit; font-weight: bold; cursor: pointer;
         }
 
         .scoreboard {
@@ -98,66 +87,25 @@
         #teamB-box { border-bottom-color: var(--team-b-color); }
 
         .settings-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: #ccc;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255, 255, 255, 0.1); border: none; color: #ccc;
+            border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px;
+            display: flex; justify-content: center; align-items: center;
         }
-
         .settings-badge:hover { background: var(--gold); color: black; }
 
         .icon-display {
-            font-size: 45px;
-            width: 70px;
-            height: 70px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #222;
-            border-radius: 50%;
-            border: 2px solid #444;
-            margin-bottom: 5px;
-            user-select: none;
+            font-size: 45px; width: 70px; height: 70px; display: flex;
+            justify-content: center; align-items: center; background: #222;
+            border-radius: 50%; border: 2px solid #444; margin-bottom: 5px; user-select: none;
         }
 
-        /* การแสดงผลจำนวนเซตที่ชนะ */
-        .sets-won {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 10px;
-        }
-
-        .set-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #444;
-            border: 1px solid #222;
-        }
-
-        .set-dot.active {
-            background: var(--gold);
-            box-shadow: 0 0 8px var(--gold);
-        }
+        .sets-won { display: flex; gap: 6px; margin-bottom: 10px; }
+        .set-dot { width: 12px; height: 12px; border-radius: 50%; background: #444; border: 1px solid #222; }
+        .set-dot.active { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
 
         h2 { margin: 0; font-size: 16px; color: #ccc; }
-        .score {
-            font-size: 80px;
-            font-weight: 800;
-            line-height: 1;
-            margin: 10px 0;
-            font-family: monospace;
-        }
+        .score { font-size: 80px; font-weight: 800; line-height: 1; margin: 10px 0; font-family: monospace; }
 
         .btn-zone { display: flex; flex-direction: column; gap: 8px; width: 90%; }
         .btn { font-family: inherit; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; user-select: none; }
@@ -166,55 +114,77 @@
         #teamB-box .btn-add { background: var(--team-b-color); }
         .btn-sub { background: #333; color: #bbb; padding: 6px; font-size: 12px; }
 
-        .action-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .btn-action {
-            padding: 12px;
-            font-size: 14px;
-            border-radius: 12px;
-            background: transparent;
-            border: 1px solid #555;
-            color: #ccc;
-        }
-
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .btn-action { padding: 12px; font-size: 14px; border-radius: 12px; background: transparent; border: 1px solid #555; color: #ccc; }
         .btn-action:hover { background: #222; color: #fff; }
         #btn-reset-match:hover { background: #dc3545; border-color: #dc3545; color: white; }
 
-        /* หน้าต่างป๊อปอัป */
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            justify-content: center;
+        /* โซนประวัติการแข่งขันย้อนหลัง */
+        .history-container {
+            width: 100%;
+            max-width: 500px;
+            background: #112019;
+            padding: 20px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 1px solid #1f3a2d;
+            box-sizing: border-box;
+            text-align: left;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            z-index: 10;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #234235;
+            padding-bottom: 8px;
         }
 
-        .modal-card {
-            background: #1a3026;
-            padding: 25px;
-            border-radius: 20px;
-            border: 2px solid var(--gold);
-            text-align: center;
-            width: 85%;
-            max-width: 360px;
+        .history-title { font-size: 16px; color: var(--gold); font-weight: bold; margin: 0; }
+        .btn-clear-history {
+            background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #ff7b82;
+            padding: 4px 10px; font-size: 11px; border-radius: 6px; cursor: pointer; font-family: inherit;
+        }
+        .btn-clear-history:hover { background: #dc3545; color: white; }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
+        .history-item {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #666;
+        }
+        .history-item.win-left { border-left-color: var(--team-a-color); }
+        .history-item.win-right { border-left-color: var(--team-b-color); }
+
+        .no-history { color: #668073; font-size: 13px; text-align: center; padding: 15px 0; width: 100%; }
+
+        /* หน้าต่างป๊อปอัป */
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 10; }
+        .modal-card { background: #1a3026; padding: 25px; border-radius: 20px; border: 2px solid var(--gold); text-align: center; width: 85%; max-width: 360px; }
         .modal-title { font-size: 20px; color: var(--gold); margin-bottom: 15px; font-weight: bold; }
         .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; }
         .emoji-item { font-size: 28px; cursor: pointer; padding: 5px; transition: 0.1s; }
         .emoji-item:hover { transform: scale(1.15); }
         .btn-close { background: #444; color: white; padding: 10px; width: 100%; }
+        .winner-title { font-size: 24px; color: var(--gold); margin-bottom: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
 
+    <!-- บล็อกหลัก: สกอร์บอร์ด -->
     <div class="container">
         <h1>SEPAK TAKRAW</h1>
         
@@ -227,6 +197,7 @@
         </div>
         
         <div class="scoreboard">
+            <!-- ฝั่งซ้าย -->
             <div class="team-box" id="teamA-box">
                 <button class="settings-badge" onclick="openSettings('A')">⚙️</button>
                 <div id="displayA" class="icon-display">🔴</div>
@@ -242,6 +213,7 @@
                 </div>
             </div>
 
+            <!-- ฝั่งขวา -->
             <div class="team-box" id="teamB-box">
                 <button class="settings-badge" onclick="openSettings('B')">⚙️</button>
                 <div id="displayB" class="icon-display">🔵</div>
@@ -264,6 +236,19 @@
         </div>
     </div>
 
+    <!-- บล็อกรอง: ประวัติการแข่งขันย้อนหลัง -->
+    <div class="history-container">
+        <div class="history-header">
+            <h3 class="history-title">📜 ประวัติการแข่งขันแมตช์ล่าสุด</h3>
+            <button class="btn-clear-history" onclick="clearMatchHistory()">ล้างประวัติทั้งหมด</button>
+        </div>
+        <div id="historyList" class="history-list">
+            <!-- ข้อมูลประวัติจะถูกเพิ่มเข้ามาตรงนี้ผ่าน Javascript -->
+            <div class="no-history">ยังไม่มีประวัติการแข่งขันในเครื่องนี้</div>
+        </div>
+    </div>
+
+    <!-- หน้าต่างป๊อปอัปเลือกไอคอน -->
     <div class="overlay" id="settingsOverlay">
         <div class="modal-card">
             <div class="modal-title" id="settingsTitle">ตั้งค่าไอคอนทีม</div>
@@ -283,6 +268,7 @@
         </div>
     </div>
 
+    <!-- ป๊อปอัพแจ้งผู้ชนะ -->
     <div class="overlay" id="winnerOverlay">
         <div class="modal-card" style="border-color: var(--gold); background: #222; max-width: 400px;">
             <div class="winner-title" id="winnerText">🎉 TEAM A WIN!</div>
@@ -291,19 +277,20 @@
     </div>
 
     <script>
-        // ระบบตัวแปรคะแนน
-        let scoreA = 0;
-        let scoreB = 0;
-        let setsWonA = 0;
-        let setsWonB = 0;
-        let targetScore = 21; // แต้มชนะตั้งต้น
-        let gameOver = false;
-        let matchOver = false;
+        let scoreA = 0, scoreB = 0;
+        let setsWonA = 0, setsWonB = 0;
+        let targetScore = 21;
+        let gameOver = false, matchOver = false;
         let currentEditingTeam = '';
 
-        // ข้อมูลของแต่ละฝั่ง (ใช้สำหรับตอนสลับฝั่งสนาม)
-        let teamLeft = { id: 'A', name: 'TEAM A', defaultIcon: '🔴' };
-        let teamRight = { id: 'B', name: 'TEAM B', defaultIcon: '🔵' };
+        // ตัวคอยติดตามชื่อดั้งเดิมเพื่อบันทึกลงประวัติอย่างถูกต้องแม้ว่าจะสลับฝั่ง
+        let teamConfigA = { name: "TEAM A", icon: "🔴" };
+        let teamConfigB = { name: "TEAM B", icon: "🔵" };
+
+        // โหลดประวัติการแข่งขันเก่าทันทีเมื่อเปิดแอป
+        window.onload = function() {
+            renderHistory();
+        };
 
         function updateMaxScoreConfig() {
             targetScore = parseInt(document.getElementById('maxScoreSelect').value);
@@ -316,15 +303,15 @@
             document.getElementById('settingsOverlay').style.display = 'flex';
         }
 
-        function closeSettings() {
-            document.getElementById('settingsOverlay').style.display = 'none';
-        }
+        function closeSettings() { document.getElementById('settingsOverlay').style.display = 'none'; }
 
         function selectEmoji(emoji) {
             if (currentEditingTeam === 'A') {
                 document.getElementById('displayA').innerText = emoji;
+                teamConfigA.icon = emoji;
             } else {
                 document.getElementById('displayB').innerText = emoji;
+                teamConfigB.icon = emoji;
             }
             closeSettings();
         }
@@ -352,11 +339,8 @@
             }
         }
 
-        // ตรวจสอบผู้ชนะในเซตนั้นๆ
         function checkSetWinner() {
-            // กติกาดิวส์: ถ้านำห่าง 2 แต้ม หรือคะแนนไปถึงแต้มสูงสุด (เป้าหมาย + 4 แต้ม เช่น 21 ชนะสูงสุดที่ 25 / 15 ชนะสูงสุดที่ 19)
             let maxDeuceScore = targetScore === 21 ? 25 : 19;
-
             if (scoreA >= targetScore || scoreB >= targetScore) {
                 if (Math.abs(scoreA - scoreB) >= 2 || scoreA === maxDeuceScore || scoreB === maxDeuceScore) {
                     gameOver = true;
@@ -382,7 +366,6 @@
             }
         }
 
-        // ตรวจสอบผู้ชนะการแข่งขัน (ชนะ 2 ใน 3 เซต)
         function checkMatchWinner() {
             let iconA = document.getElementById('displayA').innerText;
             let iconB = document.getElementById('displayB').innerText;
@@ -391,15 +374,14 @@
 
             if (setsWonA === 2) {
                 matchOver = true;
-                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconA} ${nameA} ชนะการแข่งขัน 2-0 เซต!`;
-                document.getElementById('winnerBtn').innerText = `จบแมตช์ / เริ่มเกมใหม่ทั้งหมด`;
+                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconA} ${nameA} ชนะการแข่งขัน ${setsWonA}-${setsWonB} เซต!`;
+                document.getElementById('winnerBtn').innerText = `บันทึกผล & เริ่มเกมใหม่`;
+                saveMatchResult(nameA, iconA, setsWonA, nameB, iconB, setsWonB, 'left');
             } else if (setsWonB === 2) {
                 matchOver = true;
-                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconB} ${nameB} ชนะการแข่งขัน 2-0 เซต!`;
-                document.getElementById('winnerBtn').innerText = `จบแมตช์ / เริ่มเกมใหม่ทั้งหมด`;
-            } else if (setsWonA === 1 && setsWonB === 1) {
-                document.getElementById('winnerText').innerText = `🎌 เสมอกัน 1-1 เซต! ต้องต่อเซตตัดสิน (เซตที่ 3)`;
-                document.getElementById('winnerBtn').innerText = `เข้าสู่เซตถัดไป`;
+                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconB} ${nameB} ชนะการแข่งขัน ${setsWonB}-${setsWonA} เซต!`;
+                document.getElementById('winnerBtn').innerText = `บันทึกผล & เริ่มเกมใหม่`;
+                saveMatchResult(nameA, iconA, setsWonA, nameB, iconB, setsWonB, 'right');
             } else {
                 let currentWinner = scoreA > scoreB ? `${iconA} ${nameA}` : `${iconB} ${nameB}`;
                 document.getElementById('winnerText').innerText = `🎉 เซตนี้จบแล้ว! ${currentWinner} ชนะในเซตนี้`;
@@ -417,20 +399,70 @@
             }
         }
 
-        // ล้างแต้มเพื่อเริ่มเซตต่อไป
+        // ระบบบันทึกประวัติลงฐานข้อมูลจำลองในเครื่อง (LocalStorage)
+        function saveMatchResult(nameA, iconA, setA, nameB, iconB, setB, winnerSide) {
+            let history = JSON.parse(localStorage.getItem('takraw_history')) || [];
+            
+            // สร้างข้อมูลแมตช์ปัจจุบัน
+            let matchData = {
+                teamA: `${iconA} ${nameA}`,
+                teamB: `${iconB} ${nameB}`,
+                scoreA: setA,
+                scoreB: setB,
+                winner: winnerSide === 'left' ? `${iconA} ${nameA}` : `${iconB} ${nameB}`,
+                sideClass: winnerSide === 'left' ? 'win-left' : 'win-right',
+                time: new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})
+            };
+
+            // บันทึกอันล่าสุดไว้บนสุด
+            history.unshift(matchData);
+            localStorage.setItem('takraw_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        // ฟังก์ชันวาดประวัติการแข่งขันออกมาบนหน้าจอ
+        function renderHistory() {
+            let history = JSON.parse(localStorage.getItem('takraw_history')) || [];
+            let historyList = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="no-history">ยังไม่มีประวัติการแข่งขันในเครื่องนี้</div>';
+                return;
+            }
+
+            let html = '';
+            history.forEach(match => {
+                html += `
+                    <div class="history-item ${match.sideClass}">
+                        <div>
+                            <strong>${match.teamA}</strong> vs <strong>${match.teamB}</strong>
+                            <div style="font-size: 10px; color: #668073; margin-top: 2px;">เวลา ${match.time} น.</div>
+                        </div>
+                        <div style="font-size: 16px; font-weight: bold; color: var(--gold);">
+                            ${match.scoreA} - ${match.scoreB}
+                        </div>
+                    </div>
+                `;
+            });
+            historyList.innerHTML = html;
+        }
+
+        // ล้างประวัติการแข่งขันทั้งหมด
+        function clearMatchHistory() {
+            if(confirm("คุณต้องการล้างประวัติการแข่งขันทั้งหมดใช่หรือไม่?")) {
+                localStorage.removeItem('takraw_history');
+                renderHistory();
+            }
+        }
+
         function resetCurrentSet() {
-            scoreA = 0;
-            scoreB = 0;
-            gameOver = false;
+            scoreA = 0; scoreB = 0; gameOver = false;
             document.getElementById('scoreA').innerText = scoreA;
             document.getElementById('scoreB').innerText = scoreB;
         }
 
-        // ล้างกระดานเริ่มต้นใหม่ทั้งหมด
         function resetFullMatch() {
-            setsWonA = 0;
-            setsWonB = 0;
-            matchOver = false;
+            setsWonA = 0; setsWonB = 0; matchOver = false;
             document.getElementById('setA-1').classList.remove('active');
             document.getElementById('setA-2').classList.remove('active');
             document.getElementById('setB-1').classList.remove('active');
@@ -438,17 +470,12 @@
             resetCurrentSet();
         }
 
-        // ระบบสลับฝั่งสนาม (ย้ายทั้งคะแนน เซตที่ชนะ ชื่อทีม และไอคอน)
         function switchSides() {
-            // สลับคะแนนเซตปัจจุบัน
             let tempScore = scoreA; scoreA = scoreB; scoreB = tempScore;
             document.getElementById('scoreA').innerText = scoreA;
             document.getElementById('scoreB').innerText = scoreB;
 
-            // สลับจำนวนเซตที่ชนะ
             let tempSets = setsWonA; setsWonA = setsWonB; setsWonB = tempSets;
-            
-            // รีเซ็ตไฟดวงกลมและวาดใหม่ตามฝั่งที่ย้ายมา
             document.getElementById('setA-1').classList.remove('active');
             document.getElementById('setA-2').classList.remove('active');
             document.getElementById('setB-1').classList.remove('active');
@@ -456,7 +483,6 @@
             updateSetDots('A', setsWonA);
             updateSetDots('B', setsWonB);
 
-            // สลับชื่อทีมและไอคอน
             let displayA = document.getElementById('displayA');
             let displayB = document.getElementById('displayB');
             let nameA = document.getElementById('nameA');
