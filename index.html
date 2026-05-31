@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตะกร้อ สกอร์บอร์ด Pro + Team Logo</title>
+    <title>ตะกร้อ สกอร์บอร์ด Pro + Quick Emoji & Flags</title>
     <style>
         :root {
             --bg-color: #0d1b15; 
@@ -36,6 +36,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.7);
             border: 2px solid #234235;
             text-align: center;
+            position: relative;
         }
 
         h1 {
@@ -69,44 +70,49 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            position: relative;
         }
 
         #teamA-box { border-bottom-color: var(--team-a-color); }
         #teamB-box { border-bottom-color: var(--team-b-color); }
 
-        /* ส่วนแสดงผลโลโก้ทีม */
-        .logo-container {
-            position: relative;
-            width: 70px;
-            height: 70px;
-            margin-bottom: 10px;
-            cursor: pointer;
-        }
-
-        .team-logo {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #555;
-            background-color: #222;
-        }
-
-        /* ปุ่มอัปโหลดแบบซ่อนตัวหนังสือ */
-        .file-input {
-            display: none;
-        }
-
-        .edit-badge {
+        /* ปุ่มตั้งค่าทีม */
+        .settings-badge {
             position: absolute;
-            bottom: 0;
-            right: 0;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #ccc;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.2s;
+        }
+
+        .settings-badge:hover {
             background: var(--gold);
             color: black;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-weight: bold;
+        }
+
+        /* ส่วนแสดงผลไอคอน/ธง */
+        .icon-display {
+            font-size: 50px;
+            width: 75px;
+            height: 75px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #222;
+            border-radius: 50%;
+            border: 2px solid #444;
+            margin-bottom: 10px;
+            user-select: none;
         }
 
         h2 {
@@ -161,8 +167,6 @@
             font-size: 13px;
         }
 
-        .btn-sub:hover { background: #444; color: #fff; }
-
         .btn-reset {
             background: transparent;
             border: 2px solid #555;
@@ -180,6 +184,7 @@
             border-color: #dc3545;
         }
 
+        /* กล่องหน้าต่างป๊อปอัพ (Overlay ทั่วไป) */
         .overlay {
             display: none;
             position: fixed;
@@ -190,18 +195,55 @@
             z-index: 10;
         }
 
-        .winner-card {
-            background: #222;
-            padding: 40px;
+        .modal-card {
+            background: #1a3026;
+            padding: 25px;
             border-radius: 20px;
-            border: 3px solid var(--gold);
+            border: 2px solid var(--gold);
             text-align: center;
+            width: 85%;
+            max-width: 360px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
 
-        .winner-title {
-            font-size: 32px;
+        .modal-title {
+            font-size: 20px;
             color: var(--gold);
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        /* ตารางตัวเลือกอิโมจิและธงชาติ */
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
             margin-bottom: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .emoji-item {
+            font-size: 28px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 8px;
+            transition: 0.1s;
+            user-select: none;
+        }
+
+        .emoji-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.15);
+        }
+
+        .btn-close {
+            background: #444;
+            color: white;
+            padding: 10px 20px;
+            font-size: 14px;
+            width: 100%;
         }
     </style>
 </head>
@@ -209,18 +251,13 @@
 
     <div class="container">
         <h1>SEPAK TAKRAW</h1>
-        <div class="subtitle">คลิกที่รูปวงกลมเพื่อตั้งค่า/เปลี่ยนโลโก้ทีม</div>
+        <div class="subtitle">กดปุ่ม ⚙️ เพื่อเลือกธงชาติหรืออิโมจิประจำทีม</div>
         
         <div class="scoreboard">
             <!-- ฝั่งทีม A -->
             <div class="team-box" id="teamA-box">
-                <!-- ส่วนคลิกเลือกไฟล์รูป -->
-                <label class="logo-container" for="uploadA">
-                    <img id="logoA" class="team-logo" src="https://cdn-icons-png.flaticon.com/512/5323/5323861.png" alt="Logo A">
-                    <span class="edit-badge">เปลี่ยน</span>
-                </label>
-                <input type="file" id="uploadA" class="file-input" accept="image/*" onchange="previewImage(event, 'logoA')">
-                
+                <button class="settings-badge" onclick="openSettings('A')">⚙️</button>
+                <div id="displayA" class="icon-display">🔴</div>
                 <h2>TEAM A</h2>
                 <div class="score" id="scoreA">0</div>
                 <div class="btn-zone">
@@ -231,13 +268,8 @@
 
             <!-- ฝั่งทีม B -->
             <div class="team-box" id="teamB-box">
-                <!-- ส่วนคลิกเลือกไฟล์รูป -->
-                <label class="logo-container" for="uploadB">
-                    <img id="logoB" class="team-logo" src="https://cdn-icons-png.flaticon.com/512/5323/5323861.png" alt="Logo B">
-                    <span class="edit-badge">เปลี่ยน</span>
-                </label>
-                <input type="file" id="uploadB" class="file-input" accept="image/*" onchange="previewImage(event, 'logoB')">
-
+                <button class="settings-badge" onclick="openSettings('B')">⚙️</button>
+                <div id="displayB" class="icon-display">🔵</div>
                 <h2>TEAM B</h2>
                 <div class="score" id="scoreB">0</div>
                 <div class="btn-zone">
@@ -250,10 +282,48 @@
         <button class="btn btn-reset" onclick="resetScore()">RESET GAME (เริ่มใหม่)</button>
     </div>
 
+    <!-- หน้าต่างป๊อปอัปเลือกไอคอน/ธงชาติ -->
+    <div class="overlay" id="settingsOverlay">
+        <div class="modal-card">
+            <div class="modal-title" id="settingsTitle">ตั้งค่าไอคอนทีม</div>
+            
+            <div style="text-align: left; font-size: 13px; color: #8da499; margin-bottom: 5px;">ธงชาติ:</div>
+            <div class="emoji-grid">
+                <div class="emoji-item" onclick="selectEmoji('🇹🇭')">🇹🇭</div>
+                <div class="emoji-item" onclick="selectEmoji('🇲🇾')">🇲🇾</div>
+                <div class="emoji-item" onclick="selectEmoji('🇰🇷')">🇰🇷</div>
+                <div class="emoji-item" onclick="selectEmoji('🇻🇳')">🇻🇳</div>
+                <div class="emoji-item" onclick="selectEmoji('🇯🇵')">🇯🇵</div>
+                <div class="emoji-item" onclick="selectEmoji('🇮🇩')">🇮🇩</div>
+                <div class="emoji-item" onclick="selectEmoji('🇸🇬')">🇸🇬</div>
+                <div class="emoji-item" onclick="selectEmoji('🇵🇭')">🇵🇭</div>
+                <div class="emoji-item" onclick="selectEmoji('🇲🇲')">🇲🇲</div>
+                <div class="emoji-item" onclick="selectEmoji('🇱🇦')">🇱🇦</div>
+            </div>
+
+            <div style="text-align: left; font-size: 13px; color: #8da499; margin-bottom: 5px;">อิโมจินำโชค:</div>
+            <div class="emoji-grid">
+                <div class="emoji-item" onclick="selectEmoji('🔥')">🔥</div>
+                <div class="emoji-item" onclick="selectEmoji('⚡')">⚡</div>
+                <div class="emoji-item" onclick="selectEmoji('🏆')">🏆</div>
+                <div class="emoji-item" onclick="selectEmoji('🐯')">🐯</div>
+                <div class="emoji-item" onclick="selectEmoji('🐉')">🐉</div>
+                <div class="emoji-item" onclick="selectEmoji('🦅')">🦅</div>
+                <div class="emoji-item" onclick="selectEmoji('🦁')">🦁</div>
+                <div class="emoji-item" onclick="selectEmoji('🦈')">🦈</div>
+                <div class="emoji-item" onclick="selectEmoji('🔴')">🔴</div>
+                <div class="emoji-item" onclick="selectEmoji('🔵')">🔵</div>
+            </div>
+
+            <button class="btn btn-close" onclick="closeSettings()">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+
+    <!-- ป๊อปอัพแจ้งผู้ชนะ -->
     <div class="overlay" id="winnerOverlay">
-        <div class="winner-card">
+        <div class="modal-card" style="border-color: var(--gold); background: #222;">
             <div class="winner-title" id="winnerText">🎉 TEAM A WIN!</div>
-            <button class="btn btn-add" style="background: #28a745; padding: 10px 30px;" onclick="closeOverlay()">ตกลง / เริ่มเกมใหม่</button>
+            <button class="btn btn-add" style="background: #28a745; padding: 10px 30px; width: auto;" onclick="closeOverlay()">ตกลง / เริ่มเกมใหม่</button>
         </div>
     </div>
 
@@ -261,17 +331,28 @@
         let scoreA = 0;
         let scoreB = 0;
         let gameOver = false;
+        let currentEditingTeam = ''; // เก็บสถานะว่ากำลังเปลี่ยนรูปให้ทีมไหนอยู่
 
-        // ระบบเปลี่ยนไฟล์รูปภาพไอคอนทีม
-        function previewImage(event, imageId) {
-            const reader = new FileReader();
-            reader.onload = function() {
-                const output = document.getElementById(imageId);
-                output.src = reader.result;
-            };
-            if(event.target.files[0]) {
-                reader.readAsDataURL(event.target.files[0]);
+        // เปิดป๊อปอัปเลือกไอคอน
+        function openSettings(team) {
+            currentEditingTeam = team;
+            document.getElementById('settingsTitle').innerText = `เลือกไอคอนสำหรับ TEAM ${team}`;
+            document.getElementById('settingsOverlay').style.display = 'flex';
+        }
+
+        // ปิดป๊อปอัปเลือกไอคอน
+        function closeSettings() {
+            document.getElementById('settingsOverlay').style.display = 'none';
+        }
+
+        // เมื่อเลือกธงหรืออิโมจิ
+        function selectEmoji(emoji) {
+            if (currentEditingTeam === 'A') {
+                document.getElementById('displayA').innerText = emoji;
+            } else if (currentEditingTeam === 'B') {
+                document.getElementById('displayB').innerText = emoji;
             }
+            closeSettings();
         }
 
         function addScore(team) {
@@ -301,14 +382,15 @@
             if (scoreA >= 21 || scoreB >= 21) {
                 if (Math.abs(scoreA - scoreB) >= 2 || scoreA === 25 || scoreB === 25) {
                     gameOver = true;
+                    let winnerIcon = scoreA > scoreB ? document.getElementById('displayA').innerText : document.getElementById('displayB').innerText;
                     let winnerName = scoreA > scoreB ? 'TEAM A' : 'TEAM B';
-                    showWinner(winnerName);
+                    showWinner(winnerName, winnerIcon);
                 }
             }
         }
 
-        function showWinner(name) {
-            document.getElementById('winnerText').innerText = `🏆 ${name} ชนะในเซตนี้!`;
+        function showWinner(name, icon) {
+            document.getElementById('winnerText').innerText = `🏆 ${icon} ${name} ชนะในเซตนี้!`;
             document.getElementById('winnerOverlay').style.display = 'flex';
         }
 
