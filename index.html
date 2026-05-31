@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตะกร้อ สกอร์บอร์ด Pro + Quick Emoji & Flags</title>
+    <title>ตะกร้อ สกอร์บอร์ด Pro - Match Mode (2 ใน 3 เซต)</title>
     <style>
         :root {
             --bg-color: #0d1b15; 
@@ -48,17 +48,39 @@
             letter-spacing: 1px;
         }
 
-        .subtitle {
+        /* โซนตั้งค่าคะแนนสูงสุด */
+        .config-zone {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .config-label {
             font-size: 13px;
             color: #8da499;
-            margin-bottom: 25px;
+            align-self: center;
+        }
+
+        .select-custom {
+            background: #222;
+            color: var(--gold);
+            border: 1px solid #444;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
         }
 
         .scoreboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .team-box {
@@ -66,7 +88,6 @@
             padding: 20px 10px;
             border-radius: 18px;
             border-bottom: 5px solid #444;
-            transition: transform 0.1s;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -76,7 +97,6 @@
         #teamA-box { border-bottom-color: var(--team-a-color); }
         #teamB-box { border-bottom-color: var(--team-b-color); }
 
-        /* ปุ่มตั้งค่าทีม */
         .settings-badge {
             position: absolute;
             top: 10px;
@@ -92,99 +112,80 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: 0.2s;
         }
 
-        .settings-badge:hover {
-            background: var(--gold);
-            color: black;
-        }
+        .settings-badge:hover { background: var(--gold); color: black; }
 
-        /* ส่วนแสดงผลไอคอน/ธง */
         .icon-display {
-            font-size: 50px;
-            width: 75px;
-            height: 75px;
+            font-size: 45px;
+            width: 70px;
+            height: 70px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: #222;
             border-radius: 50%;
             border: 2px solid #444;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             user-select: none;
         }
 
-        h2 {
-            margin: 0;
-            font-size: 16px;
-            color: #ccc;
+        /* การแสดงผลจำนวนเซตที่ชนะ */
+        .sets-won {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
         }
 
-        #teamA-box h2 { color: #ff7b82; }
-        #teamB-box h2 { color: #75aadb; }
+        .set-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #444;
+            border: 1px solid #222;
+        }
 
+        .set-dot.active {
+            background: var(--gold);
+            box-shadow: 0 0 8px var(--gold);
+        }
+
+        h2 { margin: 0; font-size: 16px; color: #ccc; }
         .score {
             font-size: 80px;
             font-weight: 800;
             line-height: 1;
-            margin: 15px 0;
+            margin: 10px 0;
             font-family: monospace;
-            text-shadow: 0 0 10px rgba(255,255,255,0.1);
         }
 
-        .btn-zone {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 90%;
-        }
-
-        .btn {
-            font-family: inherit;
-            font-weight: bold;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            user-select: none;
-        }
-
-        .btn-add {
-            padding: 16px;
-            font-size: 18px;
-            color: white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-
+        .btn-zone { display: flex; flex-direction: column; gap: 8px; width: 90%; }
+        .btn { font-family: inherit; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; user-select: none; }
+        .btn-add { padding: 16px; font-size: 18px; color: white; }
         #teamA-box .btn-add { background: var(--team-a-color); }
         #teamB-box .btn-add { background: var(--team-b-color); }
+        .btn-sub { background: #333; color: #bbb; padding: 6px; font-size: 12px; }
 
-        .btn-sub {
-            background: #333;
-            color: #bbb;
-            padding: 8px;
-            font-size: 13px;
-        }
-
-        .btn-reset {
-            background: transparent;
-            border: 2px solid #555;
-            color: #aaa;
-            padding: 12px;
-            width: 100%;
-            font-size: 15px;
-            border-radius: 12px;
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             margin-top: 10px;
         }
 
-        .btn-reset:hover {
-            background: #dc3545;
-            color: white;
-            border-color: #dc3545;
+        .btn-action {
+            padding: 12px;
+            font-size: 14px;
+            border-radius: 12px;
+            background: transparent;
+            border: 1px solid #555;
+            color: #ccc;
         }
 
-        /* กล่องหน้าต่างป๊อปอัพ (Overlay ทั่วไป) */
+        .btn-action:hover { background: #222; color: #fff; }
+        #btn-reset-match:hover { background: #dc3545; border-color: #dc3545; color: white; }
+
+        /* หน้าต่างป๊อปอัป */
         .overlay {
             display: none;
             position: fixed;
@@ -203,62 +204,37 @@
             text-align: center;
             width: 85%;
             max-width: 360px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
 
-        .modal-title {
-            font-size: 20px;
-            color: var(--gold);
-            margin-bottom: 15px;
-            font-weight: bold;
-        }
-
-        /* ตารางตัวเลือกอิโมจิและธงชาติ */
-        .emoji-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-            background: rgba(0,0,0,0.2);
-            padding: 15px;
-            border-radius: 12px;
-        }
-
-        .emoji-item {
-            font-size: 28px;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 8px;
-            transition: 0.1s;
-            user-select: none;
-        }
-
-        .emoji-item:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.15);
-        }
-
-        .btn-close {
-            background: #444;
-            color: white;
-            padding: 10px 20px;
-            font-size: 14px;
-            width: 100%;
-        }
+        .modal-title { font-size: 20px; color: var(--gold); margin-bottom: 15px; font-weight: bold; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; }
+        .emoji-item { font-size: 28px; cursor: pointer; padding: 5px; transition: 0.1s; }
+        .emoji-item:hover { transform: scale(1.15); }
+        .btn-close { background: #444; color: white; padding: 10px; width: 100%; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>SEPAK TAKRAW</h1>
-        <div class="subtitle">กดปุ่ม ⚙️ เพื่อเลือกธงชาติหรืออิโมจิประจำทีม</div>
+        
+        <div class="config-zone">
+            <span class="config-label">คะแนนชนะในเซตปกติ:</span>
+            <select id="maxScoreSelect" class="select-custom" onchange="updateMaxScoreConfig()">
+                <option value="21">21 คะแนน</option>
+                <option value="15">15 คะแนน</option>
+            </select>
+        </div>
         
         <div class="scoreboard">
-            <!-- ฝั่งทีม A -->
             <div class="team-box" id="teamA-box">
                 <button class="settings-badge" onclick="openSettings('A')">⚙️</button>
                 <div id="displayA" class="icon-display">🔴</div>
-                <h2>TEAM A</h2>
+                <h2 id="nameA">TEAM A</h2>
+                <div class="sets-won">
+                    <div id="setA-1" class="set-dot"></div>
+                    <div id="setA-2" class="set-dot"></div>
+                </div>
                 <div class="score" id="scoreA">0</div>
                 <div class="btn-zone">
                     <button class="btn btn-add" onclick="addScore('A')">+ POINT</button>
@@ -266,11 +242,14 @@
                 </div>
             </div>
 
-            <!-- ฝั่งทีม B -->
             <div class="team-box" id="teamB-box">
                 <button class="settings-badge" onclick="openSettings('B')">⚙️</button>
                 <div id="displayB" class="icon-display">🔵</div>
-                <h2>TEAM B</h2>
+                <h2 id="nameB">TEAM B</h2>
+                <div class="sets-won">
+                    <div id="setB-1" class="set-dot"></div>
+                    <div id="setB-2" class="set-dot"></div>
+                </div>
                 <div class="score" id="scoreB">0</div>
                 <div class="btn-zone">
                     <button class="btn btn-add" onclick="addScore('B')">+ POINT</button>
@@ -279,132 +258,212 @@
             </div>
         </div>
 
-        <button class="btn btn-reset" onclick="resetScore()">RESET GAME (เริ่มใหม่)</button>
+        <div class="action-grid">
+            <button class="btn btn-action" onclick="switchSides()">🔄 สลับฝั่งสนาม</button>
+            <button class="btn btn-action" id="btn-reset-match" onclick="resetFullMatch()">เริ่มแมตช์ใหม่</button>
+        </div>
     </div>
 
-    <!-- หน้าต่างป๊อปอัปเลือกไอคอน/ธงชาติ -->
     <div class="overlay" id="settingsOverlay">
         <div class="modal-card">
             <div class="modal-title" id="settingsTitle">ตั้งค่าไอคอนทีม</div>
-            
-            <div style="text-align: left; font-size: 13px; color: #8da499; margin-bottom: 5px;">ธงชาติ:</div>
             <div class="emoji-grid">
                 <div class="emoji-item" onclick="selectEmoji('🇹🇭')">🇹🇭</div>
                 <div class="emoji-item" onclick="selectEmoji('🇲🇾')">🇲🇾</div>
                 <div class="emoji-item" onclick="selectEmoji('🇰🇷')">🇰🇷</div>
                 <div class="emoji-item" onclick="selectEmoji('🇻🇳')">🇻🇳</div>
                 <div class="emoji-item" onclick="selectEmoji('🇯🇵')">🇯🇵</div>
-                <div class="emoji-item" onclick="selectEmoji('🇮🇩')">🇮🇩</div>
-                <div class="emoji-item" onclick="selectEmoji('🇸🇬')">🇸🇬</div>
-                <div class="emoji-item" onclick="selectEmoji('🇵🇭')">🇵🇭</div>
-                <div class="emoji-item" onclick="selectEmoji('🇲🇲')">🇲🇲</div>
-                <div class="emoji-item" onclick="selectEmoji('🇱🇦')">🇱🇦</div>
-            </div>
-
-            <div style="text-align: left; font-size: 13px; color: #8da499; margin-bottom: 5px;">อิโมจินำโชค:</div>
-            <div class="emoji-grid">
                 <div class="emoji-item" onclick="selectEmoji('🔥')">🔥</div>
                 <div class="emoji-item" onclick="selectEmoji('⚡')">⚡</div>
                 <div class="emoji-item" onclick="selectEmoji('🏆')">🏆</div>
                 <div class="emoji-item" onclick="selectEmoji('🐯')">🐯</div>
                 <div class="emoji-item" onclick="selectEmoji('🐉')">🐉</div>
-                <div class="emoji-item" onclick="selectEmoji('🦅')">🦅</div>
-                <div class="emoji-item" onclick="selectEmoji('🦁')">🦁</div>
-                <div class="emoji-item" onclick="selectEmoji('🦈')">🦈</div>
-                <div class="emoji-item" onclick="selectEmoji('🔴')">🔴</div>
-                <div class="emoji-item" onclick="selectEmoji('🔵')">🔵</div>
             </div>
-
             <button class="btn btn-close" onclick="closeSettings()">ปิดหน้าต่าง</button>
         </div>
     </div>
 
-    <!-- ป๊อปอัพแจ้งผู้ชนะ -->
     <div class="overlay" id="winnerOverlay">
-        <div class="modal-card" style="border-color: var(--gold); background: #222;">
+        <div class="modal-card" style="border-color: var(--gold); background: #222; max-width: 400px;">
             <div class="winner-title" id="winnerText">🎉 TEAM A WIN!</div>
-            <button class="btn btn-add" style="background: #28a745; padding: 10px 30px; width: auto;" onclick="closeOverlay()">ตกลง / เริ่มเกมใหม่</button>
+            <button class="btn btn-add" id="winnerBtn" style="background: #28a745; padding: 12px 30px; width: 100%;" onclick="handleWinnerClose()">ตกลง</button>
         </div>
     </div>
 
     <script>
+        // ระบบตัวแปรคะแนน
         let scoreA = 0;
         let scoreB = 0;
+        let setsWonA = 0;
+        let setsWonB = 0;
+        let targetScore = 21; // แต้มชนะตั้งต้น
         let gameOver = false;
-        let currentEditingTeam = ''; // เก็บสถานะว่ากำลังเปลี่ยนรูปให้ทีมไหนอยู่
+        let matchOver = false;
+        let currentEditingTeam = '';
 
-        // เปิดป๊อปอัปเลือกไอคอน
-        function openSettings(team) {
-            currentEditingTeam = team;
-            document.getElementById('settingsTitle').innerText = `เลือกไอคอนสำหรับ TEAM ${team}`;
+        // ข้อมูลของแต่ละฝั่ง (ใช้สำหรับตอนสลับฝั่งสนาม)
+        let teamLeft = { id: 'A', name: 'TEAM A', defaultIcon: '🔴' };
+        let teamRight = { id: 'B', name: 'TEAM B', defaultIcon: '🔵' };
+
+        function updateMaxScoreConfig() {
+            targetScore = parseInt(document.getElementById('maxScoreSelect').value);
+            resetCurrentSet();
+        }
+
+        function openSettings(side) {
+            currentEditingTeam = side;
+            document.getElementById('settingsTitle').innerText = `เลือกไอคอนสำหรับฝั่ง ${side === 'A' ? 'ซ้าย' : 'ขวา'}`;
             document.getElementById('settingsOverlay').style.display = 'flex';
         }
 
-        // ปิดป๊อปอัปเลือกไอคอน
         function closeSettings() {
             document.getElementById('settingsOverlay').style.display = 'none';
         }
 
-        // เมื่อเลือกธงหรืออิโมจิ
         function selectEmoji(emoji) {
             if (currentEditingTeam === 'A') {
                 document.getElementById('displayA').innerText = emoji;
-            } else if (currentEditingTeam === 'B') {
+            } else {
                 document.getElementById('displayB').innerText = emoji;
             }
             closeSettings();
         }
 
-        function addScore(team) {
-            if (gameOver) return;
-            if (team === 'A') {
+        function addScore(side) {
+            if (gameOver || matchOver) return;
+            if (side === 'A') {
                 scoreA++;
                 document.getElementById('scoreA').innerText = scoreA;
             } else {
                 scoreB++;
                 document.getElementById('scoreB').innerText = scoreB;
             }
-            checkWinner();
+            checkSetWinner();
         }
 
-        function subScore(team) {
-            if (gameOver) return;
-            if (team === 'A' && scoreA > 0) {
+        function subScore(side) {
+            if (gameOver || matchOver) return;
+            if (side === 'A' && scoreA > 0) {
                 scoreA--;
                 document.getElementById('scoreA').innerText = scoreA;
-            } else if (team === 'B' && scoreB > 0) {
+            } else if (side === 'B' && scoreB > 0) {
                 scoreB--;
                 document.getElementById('scoreB').innerText = scoreB;
             }
         }
 
-        function checkWinner() {
-            if (scoreA >= 21 || scoreB >= 21) {
-                if (Math.abs(scoreA - scoreB) >= 2 || scoreA === 25 || scoreB === 25) {
+        // ตรวจสอบผู้ชนะในเซตนั้นๆ
+        function checkSetWinner() {
+            // กติกาดิวส์: ถ้านำห่าง 2 แต้ม หรือคะแนนไปถึงแต้มสูงสุด (เป้าหมาย + 4 แต้ม เช่น 21 ชนะสูงสุดที่ 25 / 15 ชนะสูงสุดที่ 19)
+            let maxDeuceScore = targetScore === 21 ? 25 : 19;
+
+            if (scoreA >= targetScore || scoreB >= targetScore) {
+                if (Math.abs(scoreA - scoreB) >= 2 || scoreA === maxDeuceScore || scoreB === maxDeuceScore) {
                     gameOver = true;
-                    let winnerIcon = scoreA > scoreB ? document.getElementById('displayA').innerText : document.getElementById('displayB').innerText;
-                    let winnerName = scoreA > scoreB ? 'TEAM A' : 'TEAM B';
-                    showWinner(winnerName, winnerIcon);
+                    if (scoreA > scoreB) {
+                        setsWonA++;
+                        updateSetDots('A', setsWonA);
+                    } else {
+                        setsWonB++;
+                        updateSetDots('B', setsWonB);
+                    }
+                    checkMatchWinner();
                 }
             }
         }
 
-        function showWinner(name, icon) {
-            document.getElementById('winnerText').innerText = `🏆 ${icon} ${name} ชนะในเซตนี้!`;
+        function updateSetDots(side, sets) {
+            if (side === 'A') {
+                if (sets >= 1) document.getElementById('setA-1').classList.add('active');
+                if (sets >= 2) document.getElementById('setA-2').classList.add('active');
+            } else {
+                if (sets >= 1) document.getElementById('setB-1').classList.add('active');
+                if (sets >= 2) document.getElementById('setB-2').classList.add('active');
+            }
+        }
+
+        // ตรวจสอบผู้ชนะการแข่งขัน (ชนะ 2 ใน 3 เซต)
+        function checkMatchWinner() {
+            let iconA = document.getElementById('displayA').innerText;
+            let iconB = document.getElementById('displayB').innerText;
+            let nameA = document.getElementById('nameA').innerText;
+            let nameB = document.getElementById('nameB').innerText;
+
+            if (setsWonA === 2) {
+                matchOver = true;
+                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconA} ${nameA} ชนะการแข่งขัน 2-0 เซต!`;
+                document.getElementById('winnerBtn').innerText = `จบแมตช์ / เริ่มเกมใหม่ทั้งหมด`;
+            } else if (setsWonB === 2) {
+                matchOver = true;
+                document.getElementById('winnerText').innerText = `🏆 แมตช์สิ้นสุด! ${iconB} ${nameB} ชนะการแข่งขัน 2-0 เซต!`;
+                document.getElementById('winnerBtn').innerText = `จบแมตช์ / เริ่มเกมใหม่ทั้งหมด`;
+            } else if (setsWonA === 1 && setsWonB === 1) {
+                document.getElementById('winnerText').innerText = `🎌 เสมอกัน 1-1 เซต! ต้องต่อเซตตัดสิน (เซตที่ 3)`;
+                document.getElementById('winnerBtn').innerText = `เข้าสู่เซตถัดไป`;
+            } else {
+                let currentWinner = scoreA > scoreB ? `${iconA} ${nameA}` : `${iconB} ${nameB}`;
+                document.getElementById('winnerText').innerText = `🎉 เซตนี้จบแล้ว! ${currentWinner} ชนะในเซตนี้`;
+                document.getElementById('winnerBtn').innerText = `เข้าสู่เซตถัดไป`;
+            }
             document.getElementById('winnerOverlay').style.display = 'flex';
         }
 
-        function closeOverlay() {
+        function handleWinnerClose() {
             document.getElementById('winnerOverlay').style.display = 'none';
-            resetScore();
+            if (matchOver) {
+                resetFullMatch();
+            } else {
+                resetCurrentSet();
+            }
         }
 
-        function resetScore() {
+        // ล้างแต้มเพื่อเริ่มเซตต่อไป
+        function resetCurrentSet() {
             scoreA = 0;
             scoreB = 0;
             gameOver = false;
             document.getElementById('scoreA').innerText = scoreA;
             document.getElementById('scoreB').innerText = scoreB;
+        }
+
+        // ล้างกระดานเริ่มต้นใหม่ทั้งหมด
+        function resetFullMatch() {
+            setsWonA = 0;
+            setsWonB = 0;
+            matchOver = false;
+            document.getElementById('setA-1').classList.remove('active');
+            document.getElementById('setA-2').classList.remove('active');
+            document.getElementById('setB-1').classList.remove('active');
+            document.getElementById('setB-2').classList.remove('active');
+            resetCurrentSet();
+        }
+
+        // ระบบสลับฝั่งสนาม (ย้ายทั้งคะแนน เซตที่ชนะ ชื่อทีม และไอคอน)
+        function switchSides() {
+            // สลับคะแนนเซตปัจจุบัน
+            let tempScore = scoreA; scoreA = scoreB; scoreB = tempScore;
+            document.getElementById('scoreA').innerText = scoreA;
+            document.getElementById('scoreB').innerText = scoreB;
+
+            // สลับจำนวนเซตที่ชนะ
+            let tempSets = setsWonA; setsWonA = setsWonB; setsWonB = tempSets;
+            
+            // รีเซ็ตไฟดวงกลมและวาดใหม่ตามฝั่งที่ย้ายมา
+            document.getElementById('setA-1').classList.remove('active');
+            document.getElementById('setA-2').classList.remove('active');
+            document.getElementById('setB-1').classList.remove('active');
+            document.getElementById('setB-2').classList.remove('active');
+            updateSetDots('A', setsWonA);
+            updateSetDots('B', setsWonB);
+
+            // สลับชื่อทีมและไอคอน
+            let displayA = document.getElementById('displayA');
+            let displayB = document.getElementById('displayB');
+            let nameA = document.getElementById('nameA');
+            let nameB = document.getElementById('nameB');
+
+            let tempIcon = displayA.innerText; displayA.innerText = displayB.innerText; displayB.innerText = tempIcon;
+            let tempName = nameA.innerText; nameA.innerText = nameB.innerText; nameB.innerText = tempName;
         }
     </script>
 </body>
