@@ -1,0 +1,6 @@
+node_modules
+.vercel
+.env*
+
+# ข้อมูลตั้งต้นที่มีชื่อกำลังพล ห้ามขึ้น GitHub/โฟลเดอร์ public
+seed-import.json
