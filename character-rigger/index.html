@@ -813,7 +813,7 @@ const GAME_DEMO = `<!doctype html>
     ctx.strokeStyle = '#ffffff22'; for (let x = Math.floor((hero.x - W) / 100) * 100; x < hero.x + W; x += 100) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 12); ctx.stroke(); }
     ctx.strokeStyle = '#f2b84b'; ctx.beginPath(); ctx.moveTo(hero.x - W, 0); ctx.lineTo(hero.x + W, 0); ctx.stroke();
     hero.draw(ctx); ctx.restore();
-    hud.textContent = '← → / A D เดิน   Space กระโดด   J โจมตี   O เปลี่ยนชุด   R ลุกขึ้น\nกดเลข: ' + names.map((n, i) => (i + 1) + '=' + n).join('  ') + (outfits.length ? '  (' + (oi < 0 ? 'ชุดเริ่มต้น' : outfits[oi]) + ')' : '');
+    hud.textContent = '← → / A D เดิน   Space กระโดด   J โจมตี   O เปลี่ยนชุด   R ลุกขึ้น\\nกดเลข: ' + names.map((n, i) => (i + 1) + '=' + n).join('  ') + (outfits.length ? '  (' + (oi < 0 ? 'ชุดเริ่มต้น' : outfits[oi]) + ')' : '');
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
