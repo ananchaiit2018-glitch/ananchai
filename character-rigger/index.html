@@ -58,6 +58,7 @@ kbd{background:#0006;border:1px solid var(--b);border-radius:4px;padding:0 4px}
   <div id="bar">
    <button id="mSetup">① ตั้งโครง</button>
    <button id="mAnim">② อนิเมชั่น</button>
+   <button id="bFit" title="ปรับมุมมองให้เห็นตัวละครพอดี">⌖ พอดีจอ</button>
    <label><input type="checkbox" id="cBones" checked> กระดูก</label>
    <label title="จำลองความเร็วเดิน เพื่อดูผ้าลู่ลม">วิ่ง <input type="range" id="rVx" min="-300" max="300" value="0" style="width:90px;padding:0"></label>
   </div>
@@ -318,7 +319,7 @@ async function setProject(p) {
   for (const im of p.images) S.images[im.name] = await loadImg(im.src);
   S.project = p; S.bone = p.bones[0] ? p.bones[0].name : null; S.slot = null; S.att = null;
   S.anim = Object.keys(p.animations)[0] || null; S.playing = false;
-  S.ch = null; rebuild(); $('#pname').value = p.name; renderAll(); autosave();
+  S.ch = null; rebuild(); $('#pname').value = p.name; renderAll(); fitCamera(); autosave();
 }
 function rebuild() {
   const old = S.ch;
@@ -334,6 +335,14 @@ function syncEquip() { S.ch.equipped = S.project.slots.map(s => s.attachment == 
 let saveT; function autosave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('rigger-project', JSON.stringify(S.project)); } catch (e) {} }, 400); }
 function changed(structural) { if (structural) { S.rig.reindex(); rebuild(); } autosave(); }
 
+function fitCamera() {
+  const ch = S.ch, { W, H } = view(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  S.project.slots.forEach((_, i) => { const r = ch.attachmentInfo(i); if (!r) return;
+    for (const [px, py] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const q = M.apply(r.m, (px - r.px) * r.w, (py - r.py) * r.h); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); } });
+  if (x0 > x1) return;
+  const z = Math.max(.3, Math.min(6, Math.min(H * .8 / (y1 - y0), W * .8 / (x1 - x0)))), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  S.cam.z = z; S.cam.x = -z * cx; S.cam.y = H / 2 - H * .72 - z * cy;
+}
 const bone = n => S.project.bones.find(b => b.name === n);
 const slotOf = n => S.project.slots.find(s => s.name === n);
 const childrenOf = n => S.project.bones.filter(b => b.parent === n);
@@ -878,6 +887,7 @@ function claudePrompt() {
 /* ---------- wiring ---------- */
 $('#mSetup').onclick = () => { S.mode = 'setup'; S.ch.setupPose = true; S.ch.pose(0); renderModeBar(); renderProps(); };
 $('#mAnim').onclick = () => { S.mode = 'anim'; S.ch.setupPose = false; S.ch.pose(0); renderModeBar(); renderProps(); };
+$('#bFit').onclick = fitCamera;
 $('#cBones').onchange = e => S.showBones = e.target.checked;
 $('#rVx').oninput = e => S.testVx = +e.target.value;
 $('#pname').onchange = e => { S.project.name = e.target.value.trim() || 'character'; autosave(); };
