@@ -1048,11 +1048,13 @@ function addAnimPack() {
 }
 
 /* ---------- ประกอบตัวละครจากรูปชิ้นส่วนอัตโนมัติ ---------- */
-const ROLES = [['head', 'หัว/ใบหน้า *'], ['shirt', 'เสื้อ/ลำตัว *'], ['shorts', 'กางเกง/กระโปรง *'], ['leg_near', 'ขาหน้า *'], ['arm_near', 'แขนหน้า *'], ['leg_far', 'ขาหลัง'], ['arm_far', 'แขนหลัง'], ['hair_front', 'ผมด้านหน้า'], ['hair_back', 'ผมด้านหลัง'], ['hat', 'หมวก'], ['weapon', 'อาวุธ (ถือที่มือหน้า)'], ['', '— ไม่ใช้รูปนี้ —']];
+const ROLES = [['head', 'หัว/ใบหน้า *'], ['torso_base', 'ลำตัวฐาน (เสื้อกล้าม+กางเกงใน)'], ['shirt', 'เสื้อ (ชั้นนอก)'], ['shorts', 'กางเกง (ชั้นนอก)'], ['leg_near', 'ขาหน้า *'], ['arm_near', 'แขนหน้า *'], ['leg_far', 'ขาหลัง'], ['arm_far', 'แขนหลัง'], ['sandal_near', 'รองเท้าหน้า'], ['sandal_far', 'รองเท้าหลัง'], ['hair_front', 'ผมด้านหน้า'], ['hair_back', 'ผมด้านหลัง'], ['hat', 'หมวก'], ['weapon', 'อาวุธ (ถือที่มือหน้า)'], ['', '— ไม่ใช้รูปนี้ —']];
 function guessRole(n) {
   n = n.toLowerCase();
   const far = /far|back|หลัง|_b\b|left|_l\b/.test(n);
   if (/hair|ผม/.test(n)) return far ? 'hair_back' : 'hair_front';
+  if (/torso_base|base|tank|undershirt|ฐาน/.test(n)) return 'torso_base';
+  if (/sandal|shoe|boot|รองเท้า/.test(n)) return far ? 'sandal_far' : 'sandal_near';
   if (/hat|cap|helmet|หมวก/.test(n)) return 'hat';
   if (/sword|weapon|staff|ดาบ|อาวุธ/.test(n)) return 'weapon';
   if (/head|face|หัว|หน้า/.test(n)) return 'head';
@@ -1070,12 +1072,13 @@ async function openRigDialog(files) {
   const box = h('div', { style: 'position:fixed;inset:0;background:#000b;z-index:20;display:flex;align-items:center;justify-content:center' });
   const sels = items.map(it => sel('', ROLES, it.role, v => it.role = v || ''));
   const body = h('div', { style: 'background:var(--p);border:1px solid var(--ac);border-radius:10px;padding:14px;max-width:560px;max-height:86vh;overflow:auto;width:92%' },
-    h('h3', { style: 'margin-top:0' }, '🧩 รูปนี้คือชิ้นส่วนไหน?'), h('div', { class: 'note' }, 'ต้องมีอย่างน้อยชิ้นที่มี * (หัว เสื้อ กางเกง ขาหน้า แขนหน้า) · ใช้ PNG พื้นหลังโปร่งใส · ท่ายืนหันขวา แขนขาตั้งตรงลง'),
+    h('h3', { style: 'margin-top:0' }, '🧩 รูปนี้คือชิ้นส่วนไหน?'), h('div', { class: 'note' }, 'ต้องมีอย่างน้อย หัว ขาหน้า แขนหน้า และ ลำตัวฐาน (หรือ เสื้อ+กางเกง) · ใช้ PNG พื้นหลังโปร่งใส · ท่ายืนหันขวา แขนขาตั้งตรงลง'),
     items.map((it, i) => h('div', { class: 'row', style: 'cursor:default' }, h('img', { class: 'thumb', style: 'height:44px;width:44px', src: it.url }), h('span', { class: 'g', title: it.f.name }, it.f.name), h('div', { style: 'width:190px' }, sels[i]))),
     h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-top:10px' }, h('button', { onclick: () => box.remove() }, 'ยกเลิก'),
       h('button', { class: 'on', onclick: async () => {
         const parts = {}; for (const it of items) if (it.role && !parts[it.role]) parts[it.role] = it;
         const miss = ROLES.filter(r => r[1].endsWith('*') && !parts[r[0]]).map(r => r[1].replace(' *', ''));
+        if (!parts.torso_base && !(parts.shirt && parts.shorts)) miss.push('ลำตัวฐาน (หรือ เสื้อ+กางเกง)');
         if (miss.length) return toast('ยังขาด: ' + miss.join(', '));
         box.remove(); await setProject(rigFromParts(parts)); toast('ประกอบตัวละครแล้ว — ปรับตำแหน่งชิ้นที่เหลื่อมด้วยแถบเลื่อนทางขวา');
       } }, 'ประกอบตัวละคร')));
@@ -1083,9 +1086,13 @@ async function openRigDialog(files) {
 }
 function rigFromParts(parts) {
   const W_ = r => parts[r].im.width, H_ = r => parts[r].im.height;
-  const legR = parts.leg_near ? 'leg_near' : 'leg_far', headH = H_('head'), headW = W_('head'), shirtH = H_('shirt'), shirtW = W_('shirt'), shortsH = H_('shorts'), shortsW = W_('shorts');
-  const hipY = -.85 * H_(legR), shortsY = .09 * shortsH, shortsTop = shortsY - shortsH, shirtY = shortsTop + .112 * shirtH, shirtTop = shirtY - shirtH;
-  const headY = shirtTop + .108 * shirtH, shoulderY = shirtTop + .3 * shirtH, top = hipY + headY - .96 * headH, k = 275 / -top;
+  const legR = parts.leg_near ? 'leg_near' : 'leg_far', headH = H_('head'), headW = W_('head'), TB = parts.torso_base;
+  const bodyR = TB ? 'torso_base' : 'shirt', shirtH = H_(bodyR), shirtW = W_(bodyR), shortsH = TB ? 0 : H_('shorts'), shortsW = TB ? W_('torso_base') : W_('shorts');
+  const hipY = -.85 * H_(legR);
+  let shortsY = 0, shirtY, shirtTop, headY, shoulderY;
+  if (TB) { shirtY = .1 * shirtH; shirtTop = shirtY - shirtH; headY = shirtTop + .08 * shirtH; shoulderY = shirtTop + .27 * shirtH; }
+  else { shortsY = .09 * shortsH; const shortsTop = shortsY - shortsH; shirtY = shortsTop + .112 * shirtH; shirtTop = shirtY - shirtH; headY = shirtTop + .108 * shirtH; shoulderY = shirtTop + .3 * shirtH; }
+  const top = hipY + headY - .96 * headH, k = 275 / -top;
   const bones = [], slots = [];
   const B = (name, parent, x, y, rot, len, physics) => bones.push({ name, parent, x: r3(x * k), y: r3(y * k), rotation: rot, scaleX: 1, scaleY: 1, length: len || 30, ...(physics ? { physics } : {}) });
   const sp = ph => ({ stiffness: 70, damping: 6, wind: 2.5, freq: .5, phase: ph, drag: .03, inertia: .4, limit: 18 });
@@ -1099,7 +1106,12 @@ function rigFromParts(parts) {
   if (parts.hair_back) SL('hair_back', 'hairBack', A('hair_back', 0, 0, 0, .5, 0));
   if (parts.arm_far) SL('arm_far', 'armFar', A('arm_far', 0, 0, -90, .5, .1));
   SL('leg_far', 'legFar', A(parts.leg_far ? 'leg_far' : legR, 0, 0, -90, .38, .03)); SL('leg_near', 'legNear', A(legR, 0, 0, -90, .38, .03));
-  SL('shorts', 'hip', A('shorts', 0, shortsY, 0, .5, 1)); SL('shirt', 'body', A('shirt', 0, shirtY, 0, .5, 1)); SL('head', 'head', A('head', 0, 0, 0, .42, .96));
+  const legW = W_(legR), legH2 = H_(legR), sdl = (role, bone) => { if (parts[role]) SL(role, bone, A(role, .97 * legH2 - .5 * H_(role), -.2 * legW, -90, .5, .5)); };
+  sdl('sandal_far', 'legFar'); sdl('sandal_near', 'legNear');
+  if (TB) SL('torso_base', 'body', A('torso_base', 0, shirtY, 0, .5, 1));
+  if (parts.shorts) SL('shorts', 'hip', A('shorts', 0, shortsY, 0, .5, 1));
+  if (parts.shirt) SL('shirt', 'body', A('shirt', 0, shirtY, 0, .5, 1));
+  SL('head', 'head', A('head', 0, 0, 0, .42, .96));
   if (parts.hair_front) SL('hair_front', 'hairFront', A('hair_front', 0, 0, 0, .5, 0));
   if (parts.hat) SL('hat', 'head', A('hat', 0, -.9 * headH, 0, .5, .85));
   SL('arm_near', 'armNear', A('arm_near', 0, 0, -90, .5, .1));
