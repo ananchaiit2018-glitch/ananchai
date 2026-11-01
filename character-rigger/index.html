@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Character Rigger — สร้างตัวละครขยับได้</title>
+<style>
+:root{--bg:#10101e;--p:#191930;--p2:#222244;--b:#34345e;--t:#e8e8ff;--m:#9a9acb;--ac:#f2b84b;--ok:#5ad19a;--bad:#ff6b6b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t);font:13px/1.4 system-ui,"Noto Sans Thai",sans-serif}
+#app{display:grid;height:100vh;grid-template-rows:auto 1fr 200px;grid-template-columns:300px 1fr 300px;grid-template-areas:"hd hd hd" "lf cv rt" "ft ft ft"}
+header{grid-area:hd;display:flex;gap:6px;align-items:center;padding:6px 10px;background:var(--p);border-bottom:1px solid var(--b);flex-wrap:wrap}
+header h1{font-size:15px;margin:0 8px 0 0;color:var(--ac)}
+#left{grid-area:lf}#right{grid-area:rt}
+#left,#right{background:var(--p);overflow:auto;padding:8px;border:0 solid var(--b)}
+#left{border-right-width:1px}#right{border-left-width:1px}
+#center{grid-area:cv;position:relative;min-width:0}
+#cv{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+#bar{position:absolute;left:8px;top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#0008;padding:5px 8px;border-radius:8px}
+footer{grid-area:ft;background:var(--p);border-top:1px solid var(--b);padding:6px 10px;display:flex;flex-direction:column;gap:6px;min-height:0}
+#animbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#tl{flex:1;min-height:0;width:100%;background:#0e0e1c;border:1px solid var(--b);border-radius:6px;cursor:ew-resize}
+h3{margin:10px 0 4px;font-size:12px;color:var(--ac);text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+button,select,input{font:inherit;color:var(--t);background:var(--p2);border:1px solid var(--b);border-radius:6px;padding:3px 8px}
+button{cursor:pointer}button:hover{border-color:var(--ac)}
+button.on{background:var(--ac);color:#111;border-color:var(--ac)}
+button.sm{padding:1px 6px;font-size:12px}
+button.bad:hover{border-color:var(--bad);color:var(--bad)}
+input[type=number]{width:70px}input[type=text]{width:100%}
+.row{display:flex;gap:4px;align-items:center;padding:3px 4px;border-radius:6px;cursor:pointer}
+.row:hover{background:#ffffff0d}.row.sel{background:#f2b84b26;outline:1px solid var(--ac)}
+.row .g{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:2px 0}
+.f span{color:var(--m);min-width:70px}.f select,.f input[type=text]{flex:1}
+.note{color:var(--m);font-size:11px;margin:4px 0}
+.thumb{height:30px;width:30px;object-fit:contain;background:#0006;border-radius:4px}
+#toast{position:fixed;left:50%;bottom:220px;transform:translateX(-50%);background:#000c;border:1px solid var(--ac);padding:6px 14px;border-radius:8px;display:none;z-index:9}
+kbd{background:#0006;border:1px solid var(--b);border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+<div id="app">
+ <header>
+  <h1>🎭 Character Rigger</h1>
+  <input id="pname" type="text" style="width:130px" title="ชื่อโปรเจกต์">
+  <button id="bNew">ใหม่</button>
+  <button id="bDemo">โหลดตัวอย่าง</button>
+  <button id="bOpen">เปิดไฟล์…</button>
+  <button id="bSave">บันทึก .json</button>
+  <button id="bPack" class="on">⬇ ส่งออกแพ็คเกจเกม (.zip)</button>
+  <button id="bPrompt">📋 คัดลอกคำสั่งให้ Claude</button>
+  <input id="fOpen" type="file" accept=".json,application/json" hidden>
+  <span class="note" style="margin-left:auto">ล้อเมาส์ = ซูม · ลากพื้นที่ว่าง = เลื่อนมุมมอง · <kbd>Space</kbd> เล่น/หยุด</span>
+ </header>
+ <aside id="left"></aside>
+ <section id="center">
+  <canvas id="cv"></canvas>
+  <div id="bar">
+   <button id="mSetup">① ตั้งโครง</button>
+   <button id="mAnim">② อนิเมชั่น</button>
+   <label><input type="checkbox" id="cBones" checked> กระดูก</label>
+   <label title="จำลองความเร็วเดิน เพื่อดูผ้าลู่ลม">วิ่ง <input type="range" id="rVx" min="-300" max="300" value="0" style="width:90px;padding:0"></label>
+  </div>
+ </section>
+ <aside id="right"></aside>
+ <footer>
+  <div id="animbar"></div>
+  <canvas id="tl"></canvas>
+ </footer>
+</div>
+<div id="toast"></div>
+
+<!-- ================= RUNTIME (ใช้ร่วมกันทั้งในตัวแก้ไขและในเกมที่ส่งออก) ================= -->
+<script id="rt" type="text/plain">
+/* rigger-runtime.js — 2D skeletal puppet runtime (Canvas 2D, no dependencies)
+ * Rigger.load(urlOrData) -> Rig ; rig.spawn(opts) -> Character
+ * Character: play(name,{loop,speed,restart}) equip(slot,att) unequip(slot) equipOutfit(name)
+ *            update(dt) draw(ctx) boneWorld(name) pick(x,y) ; fields x y scale facing vx vy
+ */
+(function (global) {
+'use strict';
+var DEG = Math.PI / 180;
+function mul(p, l) {
+  return [p[0]*l[0]+p[2]*l[1], p[1]*l[0]+p[3]*l[1], p[0]*l[2]+p[2]*l[3], p[1]*l[2]+p[3]*l[3],
+          p[0]*l[4]+p[2]*l[5]+p[4], p[1]*l[4]+p[3]*l[5]+p[5]];
+}
+function loc(x, y, rot, sx, sy) {
+  var r = rot * DEG, c = Math.cos(r), s = Math.sin(r);
+  return [c*sx, s*sx, -s*sy, c*sy, x, y];
+}
+function inv(m) {
+  var d = m[0]*m[3] - m[1]*m[2], a = m[3]/d, b = -m[1]/d, c = -m[2]/d, dd = m[0]/d;
+  return [a, b, c, dd, -(a*m[4] + c*m[5]), -(b*m[4] + dd*m[5])];
+}
+function apply(m, x, y) { return { x: m[0]*x + m[2]*y + m[4], y: m[1]*x + m[3]*y + m[5] }; }
+function ease(k, t) { return k === 'step' ? 0 : k === 'smooth' ? t*t*(3-2*t) : t; }
+function sample(keys, t, fields) {
+  if (!keys || !keys.length) return null;
+  if (t <= keys[0].time) return keys[0];
+  var last = keys[keys.length-1];
+  if (t >= last.time) return last;
+  var i = 0;
+  while (keys[i+1].time <= t) i++;
+  var a = keys[i], b = keys[i+1], k = ease(a.curve, (t - a.time) / (b.time - a.time)), o = {};
+  for (var j = 0; j < fields.length; j++) { var f = fields[j]; o[f] = a[f] + (b[f] - a[f]) * k; }
+  return o;
+}
+function loadImage(src) {
+  return new Promise(function (res, rej) {
+    var im = new Image();
+    im.onload = function () { res(im); };
+    im.onerror = function () { rej(new Error('โหลดรูปไม่ได้: ' + String(src).slice(0, 80))); };
+    im.src = src;
+  });
+}
+
+function Rig(data, images) { this.data = data; this.images = images || {}; this.reindex(); }
+Rig.prototype.reindex = function () {
+  var self = this, bones = this.data.bones;
+  this.boneIndex = {}; bones.forEach(function (b, i) { self.boneIndex[b.name] = i; });
+  this.slotIndex = {}; this.data.slots.forEach(function (s, i) { self.slotIndex[s.name] = i; });
+  this.parentIdx = bones.map(function (b) { return b.parent != null && self.boneIndex[b.parent] != null ? self.boneIndex[b.parent] : -1; });
+  var order = [], seen = bones.map(function () { return 0; });
+  function visit(i) { if (seen[i]) return; seen[i] = 1; var p = self.parentIdx[i]; if (p >= 0) visit(p); order.push(i); }
+  bones.forEach(function (_, i) { visit(i); });
+  this.order = order;
+  this.slotBone = this.data.slots.map(function (s) { return self.boneIndex[s.bone]; });
+};
+Rig.prototype.spawn = function (opts) { var c = new Character(this); if (opts) for (var k in opts) c[k] = opts[k]; if (!c.animName && this.data.animations.idle) c.play('idle'); c.pose(0); return c; };
+Rig.prototype.animationNames = function () { return Object.keys(this.data.animations || {}); };
+Rig.prototype.outfitNames = function () { return Object.keys(this.data.outfits || {}); };
+
+function Character(rig) {
+  this.rig = rig; this.x = 0; this.y = 0; this.scale = 1; this.facing = 1; this.vx = 0; this.vy = 0;
+  this.time = 0; this.clock = 0; this.animName = null; this.loop = true; this.speed = 1; this.playing = true;
+  this.animDone = false; this.onComplete = null; this.physicsOn = true; this.setupPose = false;
+  this.equipped = rig.data.slots.map(function (s) { return s.attachment == null ? null : s.attachment; });
+  this.world = []; this.local = []; this.acc = []; this.phys = [];
+  this.pose(0);
+}
+Character.prototype.play = function (name, o) {
+  o = o || {};
+  var a = this.rig.data.animations[name];
+  if (!a) return false;
+  if (this.animName !== name || o.restart) { this.animName = name; this.time = 0; this.animDone = false; }
+  this.loop = o.loop != null ? o.loop : (a.loop !== false);
+  if (o.speed != null) this.speed = o.speed;
+  this.playing = true;
+  return true;
+};
+Character.prototype.stop = function () { this.animName = null; };
+Character.prototype._slot = function (n) { var i = this.rig.slotIndex[n]; if (i == null) throw new Error('ไม่มี slot ชื่อ ' + n); return i; };
+Character.prototype.equip = function (slot, att) {
+  var i = this._slot(slot);
+  if (att != null && !this.rig.data.slots[i].attachments.some(function (a) { return a.name === att; })) return false;
+  this.equipped[i] = att; return true;
+};
+Character.prototype.unequip = function (slot) { this.equipped[this._slot(slot)] = null; };
+Character.prototype.unequipAll = function () { for (var i = 0; i < this.equipped.length; i++) this.equipped[i] = null; };
+Character.prototype.equipOutfit = function (name) {
+  var o = this.rig.data.outfits[name]; if (!o) return false;
+  for (var s in o) if (this.rig.slotIndex[s] != null) this.equip(s, o[s]);
+  return true;
+};
+Character.prototype.getOutfit = function () {
+  var o = {}, self = this; this.rig.data.slots.forEach(function (s, i) { o[s.name] = self.equipped[i]; }); return o;
+};
+Character.prototype.resetPhysics = function () { this.phys = []; };
+Character.prototype.update = function (dt) {
+  dt = Math.min(Math.max(dt, 0), 0.05);
+  this.clock += dt;
+  var a = !this.setupPose && this.animName ? this.rig.data.animations[this.animName] : null;
+  if (a && this.playing) {
+    var dur = a.duration || 1; this.time += dt * this.speed;
+    if (this.loop) { if (this.time >= dur) this.time %= dur; if (this.time < 0) this.time += dur; }
+    else if (this.time >= dur) { this.time = dur; if (!this.animDone) { this.animDone = true; if (this.onComplete) this.onComplete(this.animName); } }
+  }
+  this.pose(dt);
+};
+Character.prototype._step = function (i, p, pAcc, dt) {
+  var st = this.phys[i] || (this.phys[i] = { a: 0, v: 0, pr: pAcc });
+  if (!this.physicsOn) { st.a = st.v = 0; st.pr = pAcc; return 0; }
+  if (dt <= 0) { st.pr = pAcc; return st.a; }
+  var k = p.stiffness != null ? p.stiffness : 60, c = p.damping != null ? p.damping : 6, lim = p.limit != null ? p.limit : 80;
+  var d = pAcc - st.pr; d = ((d + 540) % 360) - 180; st.pr = pAcc;
+  var pav = Math.max(-720, Math.min(720, d / dt));
+  var n = Math.max(1, Math.ceil(dt * 120)), h = dt / n;
+  for (var s = 0; s < n; s++) {
+    var target = (p.wind || 0) * Math.sin(2*Math.PI*(p.freq != null ? p.freq : 0.5)*(this.clock + s*h) + (p.phase || 0)) + (p.drag || 0) * this.vx * this.facing;
+    var acc = k * (target - st.a) - c * st.v - (p.inertia || 0) * pav;
+    st.v += acc * h; st.a += st.v * h;
+    if (st.a > lim) { st.a = lim; if (st.v > 0) st.v = 0; } else if (st.a < -lim) { st.a = -lim; if (st.v < 0) st.v = 0; }
+  }
+  return st.a;
+};
+Character.prototype.pose = function (dt) {
+  var rig = this.rig, D = rig.data, bones = D.bones, t = this.time;
+  var anim = !this.setupPose && this.animName ? D.animations[this.animName] : null;
+  var base = [this.facing * this.scale, 0, 0, this.scale, this.x, this.y];
+  for (var q = 0; q < rig.order.length; q++) {
+    var i = rig.order[q], b = bones[i], pi = rig.parentIdx[i];
+    var x = b.x, y = b.y, rot = b.rotation, sx = b.scaleX == null ? 1 : b.scaleX, sy = b.scaleY == null ? 1 : b.scaleY;
+    var tr = anim && anim.tracks && anim.tracks[b.name];
+    if (tr) {
+      var r = sample(tr.rotate, t, ['value']); if (r) rot += r.value;
+      var tt = sample(tr.translate, t, ['x', 'y']); if (tt) { x += tt.x; y += tt.y; }
+      var s = sample(tr.scale, t, ['x', 'y']); if (s) { sx *= s.x; sy *= s.y; }
+    }
+    var pw = pi >= 0 ? this.world[pi] : base, pAcc = pi >= 0 ? this.acc[pi] : 0;
+    if (b.physics) rot += this._step(i, b.physics, pAcc, dt);
+    this.local[i] = { x: x, y: y, rot: rot, sx: sx, sy: sy };
+    this.acc[i] = pAcc + rot;
+    this.world[i] = mul(pw, loc(x, y, rot, sx, sy));
+  }
+};
+Character.prototype.attachmentInfo = function (i) {
+  var s = this.rig.data.slots[i], name = this.equipped[i];
+  if (name == null) return null;
+  var att = null; for (var k = 0; k < s.attachments.length; k++) if (s.attachments[k].name === name) att = s.attachments[k];
+  if (!att) return null;
+  var img = this.rig.images[att.image], bw = this.world[this.rig.slotBone[i]];
+  if (!img || !bw) return null;
+  var sc = att.scale == null ? 1 : att.scale;
+  return { att: att, img: img, w: img.width, h: img.height,
+    px: att.pivotX == null ? 0.5 : att.pivotX, py: att.pivotY == null ? 0.5 : att.pivotY,
+    m: mul(bw, loc(att.x || 0, att.y || 0, att.rotation || 0, sc, sc)) };
+};
+Character.prototype.draw = function (ctx) {
+  var slots = this.rig.data.slots;
+  for (var i = 0; i < slots.length; i++) {
+    var r = this.attachmentInfo(i); if (!r) continue;
+    ctx.save();
+    if (r.att.alpha != null) ctx.globalAlpha *= r.att.alpha;
+    ctx.transform(r.m[0], r.m[1], r.m[2], r.m[3], r.m[4], r.m[5]);
+    ctx.drawImage(r.img, -r.px * r.w, -r.py * r.h, r.w, r.h);
+    ctx.restore();
+  }
+};
+Character.prototype.pick = function (x, y) {
+  for (var i = this.rig.data.slots.length - 1; i >= 0; i--) {
+    var r = this.attachmentInfo(i); if (!r) continue;
+    var p = apply(inv(r.m), x, y);
+    if (p.x >= -r.px*r.w && p.x <= (1-r.px)*r.w && p.y >= -r.py*r.h && p.y <= (1-r.py)*r.h) return i;
+  }
+  return -1;
+};
+Character.prototype.boneWorld = function (name) {
+  var i = this.rig.boneIndex[name]; if (i == null) return null;
+  var m = this.world[i]; return { x: m[4], y: m[5], rotation: Math.atan2(m[1], m[0]) / DEG, matrix: m };
+};
+
+function load(src, opts) {
+  opts = opts || {};
+  var base = opts.basePath != null ? opts.basePath : (typeof src === 'string' ? src.replace(/[^\/]*$/, '') : '');
+  var p = typeof src === 'string' ? fetch(src).then(function (r) { if (!r.ok) throw new Error('โหลด ' + src + ' ไม่ได้ (' + r.status + ')'); return r.json(); }) : Promise.resolve(src);
+  return p.then(function (data) {
+    var images = {};
+    return Promise.all((data.images || []).map(function (im) {
+      var url = /^(data:|blob:|https?:|\/)/.test(im.src) ? im.src : base + im.src;
+      return loadImage(url).then(function (img) { images[im.name] = img; });
+    })).then(function () { return new Rig(data, images); });
+  });
+}
+global.Rigger = { version: '1.0', Rig: Rig, Character: Character, load: load, math: { mul: mul, loc: loc, inv: inv, apply: apply } };
+})(typeof window !== 'undefined' ? window : this);
+</script>
+
+<script>
+'use strict';
+(new Function(document.getElementById('rt').textContent))();
+const Rigger = window.Rigger, M = Rigger.math, DEG = Math.PI / 180;
+const $ = (s, r = document) => r.querySelector(s);
+{ const rc = Element.prototype.replaceChildren; Element.prototype.replaceChildren = function (...k) { return rc.apply(this, k.flat(9).filter(c => c != null && c !== false)); }; }
+
+/* ---------- DOM helpers ---------- */
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in attrs || {}) {
+    const v = attrs[k];
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'style') e.style.cssText = v;
+    else if (k === 'value' || k === 'checked' || k === 'disabled') e[k] = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(9)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(c)); }
+  return e;
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 2600); }
+const num = (label, val, step, on) => {
+  const i = h('input', { type: 'number', step, value: +(+val).toFixed(3) });
+  i.addEventListener('input', () => { const v = parseFloat(i.value); if (!isNaN(v)) on(v); });
+  return h('label', { class: 'f' }, h('span', {}, label), i);
+};
+const txt = (label, val, on) => { const i = h('input', { type: 'text', value: val }); i.addEventListener('change', () => on(i.value.trim())); return h('label', { class: 'f' }, h('span', {}, label), i); };
+const sel = (label, opts, val, on) => {
+  const s = h('select', {}, opts.map(([v, l]) => h('option', { value: v, selected: v === val }, l)));
+  s.addEventListener('change', () => on(s.value === '' ? null : s.value));
+  return h('label', { class: 'f' }, h('span', {}, label), s);
+};
+const uniq = (base, exists) => { let n = base, i = 2; while (exists(n)) n = base + i++; return n; };
+const norm180 = a => ((a + 540) % 360 + 360) % 360 - 180;
+const r3 = v => Math.round(v * 1000) / 1000;
+
+/* ---------- state ---------- */
+const S = { project: null, images: {}, rig: null, ch: null, mode: 'setup', bone: 'root', slot: null, att: null,
+  anim: null, playing: false, showBones: true, cam: { x: 0, y: 0, z: 2.2 }, testVx: 0, drag: null };
+
+function newProject(name) {
+  return { format: 'rigger', version: 1, name: name || 'character', images: [],
+    bones: [{ name: 'root', parent: null, x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, length: 30 }],
+    slots: [], outfits: {}, animations: {} };
+}
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+
+async function setProject(p) {
+  S.images = {};
+  for (const im of p.images) S.images[im.name] = await loadImg(im.src);
+  S.project = p; S.bone = p.bones[0] ? p.bones[0].name : null; S.slot = null; S.att = null;
+  S.anim = Object.keys(p.animations)[0] || null; S.playing = false;
+  S.ch = null; rebuild(); $('#pname').value = p.name; renderAll(); autosave();
+}
+function rebuild() {
+  const old = S.ch;
+  S.rig = new Rigger.Rig(S.project, S.images);
+  S.ch = S.rig.spawn();
+  S.ch.onComplete = () => { S.playing = false; renderAnimBar(); };
+  if (old) S.ch.time = old.time;
+  syncAnim(); syncEquip();
+  S.ch.setupPose = S.mode === 'setup'; S.ch.physicsOn = false; S.ch.pose(0);
+}
+function syncAnim() { const a = S.anim && S.project.animations[S.anim]; S.ch.animName = a ? S.anim : null; S.ch.loop = a ? a.loop !== false : true; }
+function syncEquip() { S.ch.equipped = S.project.slots.map(s => s.attachment == null ? null : s.attachment); }
+let saveT; function autosave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('rigger-project', JSON.stringify(S.project)); } catch (e) {} }, 400); }
+function changed(structural) { if (structural) { S.rig.reindex(); rebuild(); } autosave(); }
+
+const bone = n => S.project.bones.find(b => b.name === n);
+const slotOf = n => S.project.slots.find(s => s.name === n);
+const childrenOf = n => S.project.bones.filter(b => b.parent === n);
+const descendants = n => childrenOf(n).flatMap(c => [c.name, ...descendants(c.name)]);
+const bIdx = n => S.rig.boneIndex[n];
+const curAnim = () => S.anim ? S.project.animations[S.anim] : null;
+
+/* ---------- keyframes ---------- */
+function track(name) {
+  const a = curAnim(); if (!a) { toast('สร้างอนิเมชั่นก่อน (แถบด้านล่าง)'); return null; }
+  const t = a.tracks[name] || (a.tracks[name] = {});
+  for (const c of ['rotate', 'translate', 'scale']) t[c] = t[c] || [];
+  return t;
+}
+function upsert(keys, time, o) {
+  const e = keys.find(k => Math.abs(k.time - time) < 0.004);
+  if (e) Object.assign(e, o); else { keys.push({ time, ...o, curve: 'smooth' }); keys.sort((a, b) => a.time - b.time); }
+}
+function keyCh(name, ch, o) { const t = track(name); if (t) { upsert(t[ch], r3(S.ch.time), o); autosave(); } }
+function keyAll(name) {
+  const b = bone(name), L = S.ch.local[bIdx(name)];
+  keyCh(name, 'rotate', { value: r3(L.rot - b.rotation) });
+  keyCh(name, 'translate', { x: r3(L.x - b.x), y: r3(L.y - b.y) });
+  keyCh(name, 'scale', { x: r3(L.sx / (b.scaleX || 1)), y: r3(L.sy / (b.scaleY || 1)) });
+}
+function setBoneField(b, f, v) {
+  if (S.mode === 'setup' || f === 'length') { b[f] = v; autosave(); return; }
+  const L = S.ch.local[bIdx(b.name)];
+  if (f === 'x' || f === 'y') keyCh(b.name, 'translate', { x: r3((f === 'x' ? v : L.x) - b.x), y: r3((f === 'y' ? v : L.y) - b.y) });
+  else if (f === 'rotation') keyCh(b.name, 'rotate', { value: r3(v - b.rotation) });
+  else keyCh(b.name, 'scale', { x: r3((f === 'scaleX' ? v : L.sx) / (b.scaleX || 1)), y: r3((f === 'scaleY' ? v : L.sy) / (b.scaleY || 1)) });
+}
+
+/* ---------- actions ---------- */
+function addBone() {
+  const parent = S.bone || 'root', name = uniq('bone', n => bone(n));
+  S.project.bones.push({ name, parent, x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, length: 30 });
+  S.bone = name; changed(true); renderAll();
+}
+function deleteBone() {
+  const n = S.bone; if (!n || n === 'root') return toast('ลบกระดูก root ไม่ได้');
+  const names = [n, ...descendants(n)];
+  if (!confirm(`ลบกระดูก ${names.join(', ')} พร้อมสลอตและคีย์ที่ผูกอยู่?`)) return;
+  const P = S.project;
+  P.bones = P.bones.filter(b => !names.includes(b.name));
+  P.slots = P.slots.filter(s => !names.includes(s.bone));
+  for (const a of Object.values(P.animations)) names.forEach(x => delete a.tracks[x]);
+  S.bone = 'root'; S.slot = null; changed(true); renderAll();
+}
+function renameBone(b, to) {
+  if (!to || to === b.name) return;
+  if (bone(to)) return toast('ชื่อซ้ำ');
+  const old = b.name, P = S.project;
+  P.bones.forEach(x => { if (x.parent === old) x.parent = to; });
+  P.slots.forEach(s => { if (s.bone === old) s.bone = to; });
+  for (const a of Object.values(P.animations)) if (a.tracks[old]) { a.tracks[to] = a.tracks[old]; delete a.tracks[old]; }
+  b.name = to; S.bone = to; changed(true); renderAll();
+}
+function reparent(b, p) {
+  if (p === b.name || descendants(b.name).includes(p)) return toast('เลือกพ่อแบบนี้ไม่ได้');
+  // รักษาตำแหน่งในโลกของกระดูกไว้
+  const w = S.ch.world[bIdx(b.name)];
+  b.parent = p;
+  S.rig.reindex();
+  const pi = p ? S.rig.boneIndex[p] : -1, pw = pi >= 0 ? S.ch.world[pi] : [1, 0, 0, 1, 0, 0];
+  const l = M.apply(M.inv(pw), w[4], w[5]); b.x = r3(l.x); b.y = r3(l.y);
+  changed(true); renderAll();
+}
+function addSlotFromImage(imgName) {
+  const im = S.images[imgName], P = S.project;
+  const name = uniq(imgName, n => slotOf(n)), sc = Math.min(1, 110 / Math.max(im.width, im.height));
+  P.slots.push({ name, bone: S.bone || 'root', attachment: 'default', attachments: [{ name: 'default', image: imgName, x: 0, y: 0, rotation: 0, scale: r3(sc), pivotX: .5, pivotY: .5 }] });
+  S.slot = name; S.att = 'default'; changed(true); renderAll();
+}
+function addAttachment(imgName) {
+  const s = slotOf(S.slot); if (!s) return toast('เลือกสลอตก่อน (ในรายการสลอตด้านซ้าย)');
+  const im = S.images[imgName], base = s.attachments[0] || {};
+  const name = uniq(imgName, n => s.attachments.some(a => a.name === n));
+  s.attachments.push({ name, image: imgName, x: base.x || 0, y: base.y || 0, rotation: base.rotation || 0, scale: base.scale || r3(Math.min(1, 110 / Math.max(im.width, im.height))), pivotX: base.pivotX ?? .5, pivotY: base.pivotY ?? .5 });
+  S.att = name; changed(true); renderAll();
+}
+function equip(slot, att) { const s = slotOf(slot); s.attachment = att; syncEquip(); autosave(); renderSlots(); renderProps(); }
+async function toPng(file) {
+  const bmp = await createImageBitmap(file), c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return c.toDataURL('image/png');
+}
+async function importFiles(files) {
+  for (const f of files) {
+    try {
+      const url = await toPng(f);
+      const name = uniq(f.name.replace(/\.[^.]+$/, '').replace(/[^\w฀-๿-]+/g, '_') || 'part', n => S.project.images.some(i => i.name === n));
+      S.images[name] = await loadImg(url); S.project.images.push({ name, src: url });
+    } catch (e) { toast('นำเข้า ' + f.name + ' ไม่สำเร็จ'); }
+  }
+  autosave(); renderAssets();
+}
+
+/* ---------- panels ---------- */
+function renderAll() { renderAssets(); renderBones(); renderSlots(); renderOutfits(); renderProps(); renderAnimBar(); renderModeBar(); }
+function renderModeBar() { $('#mSetup').classList.toggle('on', S.mode === 'setup'); $('#mAnim').classList.toggle('on', S.mode === 'anim'); }
+
+function renderAssets() {
+  const P = S.project, el = $('#left');
+  if (!el._built) { el._built = 1; el.append(h('div', { id: 'pa' }), h('div', { id: 'pb' }), h('div', { id: 'ps' }), h('div', { id: 'po' })); }
+  const pa = $('#pa');
+  const inp = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: e => { importFiles([...e.target.files]); e.target.value = ''; } });
+  pa.replaceChildren(
+    h('h3', {}, '1 · ชิ้นส่วนภาพ (PNG โปร่งใส)', h('button', { class: 'sm', onclick: () => inp.click() }, '+ นำเข้า')), inp,
+    P.images.length ? null : h('div', { class: 'note' }, 'นำเข้าภาพที่ตัดแยกชิ้นแล้ว (หัว ตัว แขน ขา ผ้าคลุม เสื้อผ้า…) หรือกด “โหลดตัวอย่าง”'),
+    P.images.map(im => h('div', { class: 'row' },
+      h('img', { class: 'thumb', src: im.src }), h('span', { class: 'g' }, im.name),
+      h('button', { class: 'sm', title: 'สร้างสลอตใหม่ผูกกับกระดูกที่เลือก', onclick: () => addSlotFromImage(im.name) }, '+สลอต'),
+      h('button', { class: 'sm', title: 'เพิ่มเป็นชุดสำรองในสลอตที่เลือก', onclick: () => addAttachment(im.name) }, '+ชุด'),
+      h('button', { class: 'sm bad', onclick: () => {
+        if (P.slots.some(s => s.attachments.some(a => a.image === im.name))) return toast('ภาพนี้ถูกใช้อยู่');
+        P.images.splice(P.images.indexOf(im), 1); delete S.images[im.name]; autosave(); renderAssets();
+      } }, '✕'))));
+}
+function renderBones() {
+  const P = S.project, rows = [];
+  const walk = (n, d) => { rows.push(h('div', { class: 'row' + (S.bone === n ? ' sel' : ''), style: `padding-left:${4 + d * 14}px`, onclick: () => { S.bone = n; renderBones(); renderProps(); } },
+    h('span', { class: 'g' }, (d ? '└ ' : '') + n), P.bones.find(b => b.name === n).physics ? h('span', { title: 'ฟิสิกส์สปริง' }, '〰') : null)); childrenOf(n).forEach(c => walk(c.name, d + 1)); };
+  P.bones.filter(b => !b.parent || !bone(b.parent)).forEach(b => walk(b.name, 0));
+  $('#pb').replaceChildren(h('h3', {}, '2 · กระดูก', h('span', {}, h('button', { class: 'sm', onclick: addBone }, '+ ลูก'), ' ', h('button', { class: 'sm bad', onclick: deleteBone }, 'ลบ'))), rows,
+    h('div', { class: 'note' }, 'ลากจุดวงกลมบนผืนผ้า = ย้าย · ลากปลายกระดูก = หมุน'));
+}
+function renderSlots() {
+  const P = S.project;
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= P.slots.length) return; [P.slots[i], P.slots[j]] = [P.slots[j], P.slots[i]]; changed(true); renderSlots(); };
+  $('#ps').replaceChildren(h('h3', {}, '3 · สลอต (ลำดับวาด + สวม/ถอด)'),
+    h('div', { class: 'note' }, 'ล่างสุด = อยู่หน้าสุด · เลือกชุดในกล่องเลื่อนเพื่อ สวม/ถอด'),
+    [...P.slots.keys()].reverse().map(i => { const s = P.slots[i]; return h('div', { class: 'row' + (S.slot === s.name ? ' sel' : ''), onclick: () => { S.slot = s.name; S.att = s.attachment || (s.attachments[0] && s.attachments[0].name); S.bone = s.bone; renderBones(); renderSlots(); renderProps(); } },
+      h('span', { class: 'g', title: 'บนกระดูก ' + s.bone }, s.name),
+      (() => { const se = h('select', { style: 'max-width:82px;padding:1px', onclick: e => e.stopPropagation(), onchange: e => equip(s.name, e.target.value || null) },
+        h('option', { value: '' }, '— ถอด —'), s.attachments.map(a => h('option', { value: a.name, selected: a.name === s.attachment }, a.name))); return se; })(),
+      h('button', { class: 'sm', title: 'ขึ้นหน้า', onclick: e => { e.stopPropagation(); move(i, 1); } }, '▲'),
+      h('button', { class: 'sm', title: 'ลงหลัง', onclick: e => { e.stopPropagation(); move(i, -1); } }, '▼')); }));
+}
+function renderOutfits() {
+  const P = S.project;
+  $('#po').replaceChildren(h('h3', {}, '4 · ชุดสำเร็จรูป', h('button', { class: 'sm', onclick: () => {
+      const n = (prompt('ตั้งชื่อชุด (บันทึกสิ่งที่สวมอยู่ตอนนี้)') || '').trim(); if (!n) return;
+      P.outfits[n] = Object.fromEntries(P.slots.map(s => [s.name, s.attachment == null ? null : s.attachment])); autosave(); renderOutfits(); } }, '+ บันทึกชุดนี้')),
+    Object.keys(P.outfits).map(n => h('div', { class: 'row', onclick: () => { for (const [sn, an] of Object.entries(P.outfits[n])) { const s = slotOf(sn); if (s) s.attachment = an; } syncEquip(); autosave(); renderSlots(); renderProps(); } },
+      h('span', { class: 'g' }, '👕 ' + n), h('button', { class: 'sm bad', onclick: e => { e.stopPropagation(); delete P.outfits[n]; autosave(); renderOutfits(); } }, '✕'))),
+    h('div', { class: 'note' }, 'ในเกมเรียก hero.equipOutfit("ชื่อชุด")'));
+}
+function renderProps() {
+  const el = $('#right'), P = S.project, frag = [];
+  const b = bone(S.bone);
+  frag.push(h('div', { class: 'note' }, S.mode === 'anim' ? '⏱ โหมดอนิเมต: แก้ค่า/ลากกระดูก = ใส่คีย์ที่เวลาปัจจุบัน' : '🔧 โหมดตั้งโครง: แก้ท่าเริ่มต้นของโครง'));
+  if (b) {
+    const i = bIdx(b.name), L = S.ch.local[i] || b;
+    const val = { x: S.mode === 'anim' ? L.x : b.x, y: S.mode === 'anim' ? L.y : b.y, rotation: S.mode === 'anim' ? L.rot : b.rotation, scaleX: S.mode === 'anim' ? L.sx : b.scaleX, scaleY: S.mode === 'anim' ? L.sy : b.scaleY };
+    frag.push(h('h3', {}, 'กระดูก: ' + b.name));
+    frag.push(txt('ชื่อ', b.name, v => renameBone(b, v)));
+    if (b.name !== 'root') frag.push(sel('พ่อ', P.bones.filter(x => x.name !== b.name && !descendants(b.name).includes(x.name)).map(x => [x.name, x.name]), b.parent, v => reparent(b, v)));
+    for (const [l, f, st] of [['X', 'x', 1], ['Y', 'y', 1], ['หมุน °', 'rotation', 1], ['ขยาย X', 'scaleX', .05], ['ขยาย Y', 'scaleY', .05], ['ความยาว', 'length', 1]])
+      frag.push(num(l, f === 'length' ? b.length : val[f], st, v => setBoneField(b, f, v)));
+    frag.push(h('div', { class: 'note' }, 'หมุน 0° = ชี้ขวา · 90° = ชี้ลง (ใช้กับผ้าคลุมที่ห้อยลง) · บวก = ตามเข็มนาฬิกา'));
+    const ph = b.physics;
+    frag.push(h('h3', {}, '〰 ฟิสิกส์สปริง (ผ้า/ผม/หาง)'));
+    frag.push(h('label', { class: 'f' }, h('span', {}, 'เปิดใช้'), h('input', { type: 'checkbox', checked: !!ph, onchange: e => { if (e.target.checked) b.physics = { stiffness: 55, damping: 5, wind: 6, freq: .6, phase: 0, drag: .08, inertia: .8, limit: 70 }; else delete b.physics; changed(true); renderBones(); renderProps(); } })));
+    if (ph) {
+      for (const [l, f, st] of [['ความตึง', 'stiffness', 5], ['หน่วง', 'damping', 1], ['ลมแกว่ง °', 'wind', 1], ['ความถี่ลม', 'freq', .1], ['เฟส (ต่อข้อ)', 'phase', .3], ['ตามวิ่ง', 'drag', .01], ['แรงเฉื่อย', 'inertia', .1], ['องศาสูงสุด', 'limit', 5]])
+        frag.push(num(l, ph[f] ?? 0, st, v => { ph[f] = v; autosave(); }));
+      frag.push(h('div', { class: 'note' }, 'ผ้าหลายท่อน: ทำกระดูกต่อกันเป็นโซ่ ใส่เฟสเพิ่มทีละข้อ (0, 0.9, 1.8) จะพริ้วเป็นคลื่น · กด ▶ และเลื่อน “วิ่ง” เพื่อดู'));
+    }
+  }
+  const s = slotOf(S.slot);
+  if (s) {
+    frag.push(h('h3', {}, 'สลอต: ' + s.name, h('button', { class: 'sm bad', onclick: () => { if (!confirm('ลบสลอต ' + s.name + '?')) return; P.slots.splice(P.slots.indexOf(s), 1); S.slot = null; changed(true); renderAll(); } }, 'ลบ')));
+    frag.push(txt('ชื่อ', s.name, v => { if (!v || v === s.name || slotOf(v)) return; for (const o of Object.values(P.outfits)) if (s.name in o) { o[v] = o[s.name]; delete o[s.name]; } s.name = v; S.slot = v; changed(true); renderAll(); }));
+    frag.push(sel('ผูกกับกระดูก', P.bones.map(x => [x.name, x.name]), s.bone, v => { s.bone = v; changed(true); }));
+    frag.push(h('div', { class: 'note' }, 'ชุดในสลอตนี้ (คลิกเพื่อแก้ · ดับเบิลคลิก = สวม)'));
+    s.attachments.forEach(a => frag.push(h('div', { class: 'row' + (S.att === a.name ? ' sel' : ''), onclick: () => { S.att = a.name; renderProps(); }, ondblclick: () => equip(s.name, a.name) },
+      h('img', { class: 'thumb', src: (P.images.find(i => i.name === a.image) || {}).src }), h('span', { class: 'g' }, a.name + (s.attachment === a.name ? '  ✔ สวมอยู่' : '')),
+      h('button', { class: 'sm', onclick: e => { e.stopPropagation(); equip(s.name, a.name); } }, 'สวม'),
+      h('button', { class: 'sm bad', onclick: e => { e.stopPropagation(); s.attachments.splice(s.attachments.indexOf(a), 1); if (s.attachment === a.name) s.attachment = null; S.att = null; changed(true); renderAll(); } }, '✕'))));
+    const a = s.attachments.find(x => x.name === S.att);
+    if (a) {
+      frag.push(h('h3', {}, 'ชิ้นส่วน: ' + a.name));
+      frag.push(txt('ชื่อชุด', a.name, v => { if (!v || v === a.name || s.attachments.some(x => x.name === v)) return; if (s.attachment === a.name) s.attachment = v; for (const o of Object.values(P.outfits)) if (o[s.name] === a.name) o[s.name] = v; a.name = v; S.att = v; changed(true); renderAll(); }));
+      frag.push(sel('รูป', P.images.map(i => [i.name, i.name]), a.image, v => { a.image = v; autosave(); }));
+      for (const [l, f, st] of [['X', 'x', 1], ['Y', 'y', 1], ['หมุน °', 'rotation', 1], ['สเกล', 'scale', .05], ['จุดหมุน X (0-1)', 'pivotX', .05], ['จุดหมุน Y (0-1)', 'pivotY', .05], ['โปร่งใส (0-1)', 'alpha', .1]])
+        frag.push(num(l, a[f] ?? (f === 'alpha' ? 1 : 0), st, v => { a[f] = v; autosave(); }));
+      frag.push(h('div', { class: 'note' }, 'โหมดตั้งโครง: ลากรูปบนผืนผ้าเพื่อเลื่อนตำแหน่งได้เลย'));
+    }
+  }
+  el.replaceChildren(...frag);
+}
+
+function renderAnimBar() {
+  const P = S.project, bar = $('#animbar'), a = curAnim();
+  bar.replaceChildren(
+    h('b', {}, '🎬'),
+    (() => { const se = h('select', { onchange: e => { S.anim = e.target.value || null; syncAnim(); S.ch.time = 0; renderAnimBar(); } }, h('option', { value: '' }, '— ไม่มีอนิเมชั่น —'), Object.keys(P.animations).map(n => h('option', { value: n, selected: n === S.anim }, n))); return se; })(),
+    h('button', { class: 'sm', onclick: () => { const n = (prompt('ชื่ออนิเมชั่น เช่น idle / walk / attack') || '').trim(); if (!n || P.animations[n]) return; P.animations[n] = { duration: 1, loop: true, tracks: {} }; S.anim = n; syncAnim(); S.ch.time = 0; S.mode = 'anim'; S.ch.setupPose = false; autosave(); renderAll(); } }, '+ ใหม่'),
+    a ? h('button', { class: 'sm', onclick: () => { const n = (prompt('ชื่อใหม่', S.anim) || '').trim(); if (!n || P.animations[n]) return; P.animations[n] = P.animations[S.anim]; delete P.animations[S.anim]; S.anim = n; syncAnim(); autosave(); renderAnimBar(); } }, 'เปลี่ยนชื่อ') : null,
+    a ? h('button', { class: 'sm bad', onclick: () => { if (!confirm('ลบอนิเมชั่น ' + S.anim + '?')) return; delete P.animations[S.anim]; S.anim = Object.keys(P.animations)[0] || null; syncAnim(); autosave(); renderAnimBar(); } }, 'ลบ') : null,
+    a ? h('label', {}, 'ยาว(วิ) ', h('input', { type: 'number', step: .1, min: .1, style: 'width:60px', value: a.duration, oninput: e => { const v = parseFloat(e.target.value); if (v > 0) { a.duration = v; autosave(); } } })) : null,
+    a ? h('label', {}, h('input', { type: 'checkbox', checked: a.loop !== false, onchange: e => { a.loop = e.target.checked; syncAnim(); autosave(); } }), ' วนลูป') : null,
+    h('button', { id: 'bPlay', class: S.playing ? 'on' : '', onclick: togglePlay }, S.playing ? '⏸ หยุด' : '▶ เล่น'),
+    h('span', { id: 'tlabel', style: 'min-width:60px' }, ''),
+    a ? h('button', { class: 'sm', title: 'ใส่คีย์ทุกช่อง (หมุน/เลื่อน/ขยาย) ของกระดูกที่เลือกที่เวลานี้', onclick: () => { keyAll(S.bone); } }, '◆ ใส่คีย์') : null,
+    a ? h('button', { class: 'sm', onclick: () => { const t = a.tracks[S.bone]; if (!t) return; for (const c of ['rotate', 'translate', 'scale']) t[c] = (t[c] || []).filter(k => Math.abs(k.time - S.ch.time) > 0.005); autosave(); } }, '◇ ลบคีย์ตรงนี้') : null,
+    a ? h('button', { class: 'sm', title: 'คัดลอกคีย์เฟรมแรกไปไว้ท้ายอนิเมชั่น ให้วนลูปเนียน', onclick: () => {
+      for (const t of Object.values(a.tracks)) for (const c of ['rotate', 'translate', 'scale']) { const ks = t[c]; if (ks && ks.length && !ks.some(k => Math.abs(k.time - a.duration) < 0.005)) { const f = { ...ks[0], time: a.duration }; ks.push(f); } }
+      autosave(); toast('คัดลอกเฟรมแรกไปท้ายแล้ว'); } }, '⟲ ปิดลูป') : null,
+    h('span', { class: 'note' }, 'แถวคีย์ = กระดูกที่เลือก (หมุน / เลื่อน / ขยาย)'));
+}
+function togglePlay() {
+  S.playing = !S.playing; S.ch.resetPhysics(); if (S.playing) { S.ch.animDone = false; if (S.mode === 'anim' && curAnim() && !curAnim().loop && S.ch.time >= curAnim().duration) S.ch.time = 0; }
+  S.ch.pose(0); renderAnimBar();
+}
+
+/* ---------- canvas ---------- */
+const cv = $('#cv'), g = cv.getContext('2d');
+const view = () => ({ W: cv.clientWidth, H: cv.clientHeight });
+const toWorld = e => { const r = cv.getBoundingClientRect(), { W, H } = view(); return { x: (e.clientX - r.left - W / 2 - S.cam.x) / S.cam.z, y: (e.clientY - r.top - H * .72 - S.cam.y) / S.cam.z }; };
+
+function drawScene() {
+  const dpr = devicePixelRatio || 1, { W, H } = view();
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = '#14142a'; g.fillRect(0, 0, W, H);
+  g.save(); g.translate(W / 2 + S.cam.x, H * .72 + S.cam.y); g.scale(S.cam.z, S.cam.z);
+  const z = S.cam.z, x0 = (-W / 2 - S.cam.x) / z, x1 = (W / 2 - S.cam.x) / z, y0 = (-H * .72 - S.cam.y) / z, y1 = (H * .28 - S.cam.y) / z;
+  g.lineWidth = 1 / z; g.strokeStyle = '#ffffff10'; g.beginPath();
+  for (let x = Math.floor(x0 / 50) * 50; x < x1; x += 50) { g.moveTo(x, y0); g.lineTo(x, y1); }
+  for (let y = Math.floor(y0 / 50) * 50; y < y1; y += 50) { g.moveTo(x0, y); g.lineTo(x1, y); }
+  g.stroke(); g.strokeStyle = '#f2b84b66'; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x1, 0); g.stroke();
+  S.ch.draw(g);
+  if (S.showBones) {
+    const bones = S.project.bones;
+    bones.forEach((b, i) => {
+      const m = S.ch.world[i]; if (!m) return; const on = b.name === S.bone;
+      const tip = M.apply(m, b.length || 30, 0);
+      g.strokeStyle = on ? '#f2b84b' : '#7fe0ff'; g.fillStyle = g.strokeStyle; g.lineWidth = (on ? 2.5 : 1.5) / z;
+      g.beginPath(); g.moveTo(m[4], m[5]); g.lineTo(tip.x, tip.y); g.stroke();
+      g.beginPath(); g.arc(m[4], m[5], (on ? 5 : 3.5) / z, 0, 7); g.fill();
+      if (on) { g.beginPath(); g.arc(tip.x, tip.y, 4.5 / z, 0, 7); g.stroke(); g.font = `${11 / z}px sans-serif`; g.fillText(b.name, m[4] + 7 / z, m[5] - 7 / z); }
+    });
+  }
+  g.restore();
+}
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const p = toWorld(e), z = S.cam.z, tol = 10 / z, ch = S.ch, bones = S.project.bones;
+  const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < tol;
+  if (S.showBones) {
+    const sb = bone(S.bone);
+    if (sb) { const m = ch.world[bIdx(sb.name)], tip = M.apply(m, sb.length || 30, 0); if (near(tip, p)) { S.drag = { type: 'rot' }; return; } }
+    for (let i = bones.length - 1; i >= 0; i--) { const m = ch.world[i]; if (near({ x: m[4], y: m[5] }, p)) { S.bone = bones[i].name; S.drag = { type: 'move' }; renderBones(); renderProps(); return; } }
+  }
+  const si = ch.pick(p.x, p.y);
+  if (si >= 0) {
+    const s = S.project.slots[si]; S.slot = s.name; S.att = s.attachment; S.bone = s.bone; renderBones(); renderSlots(); renderProps();
+    if (S.mode === 'setup') { const att = s.attachments.find(a => a.name === s.attachment), bw = ch.world[bIdx(s.bone)], lp = M.apply(M.inv(bw), p.x, p.y); S.drag = { type: 'att', att, off: { x: lp.x - att.x, y: lp.y - att.y } }; }
+    return;
+  }
+  S.drag = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: S.cam.x, cy: S.cam.y };
+});
+cv.addEventListener('pointermove', e => {
+  const d = S.drag; if (!d) return;
+  if (d.type === 'pan') { S.cam.x = d.cx + e.clientX - d.sx; S.cam.y = d.cy + e.clientY - d.sy; return; }
+  const p = toWorld(e), ch = S.ch;
+  if (d.type === 'att') { const s = slotOf(S.slot), lp = M.apply(M.inv(ch.world[bIdx(s.bone)]), p.x, p.y); d.att.x = r3(lp.x - d.off.x); d.att.y = r3(lp.y - d.off.y); autosave(); d.dirty = 1; return; }
+  const b = bone(S.bone), i = bIdx(b.name), pi = S.rig.parentIdx[i], pw = pi >= 0 ? ch.world[pi] : [1, 0, 0, 1, 0, 0];
+  if (d.type === 'move') {
+    const lp = M.apply(M.inv(pw), p.x, p.y);
+    if (S.mode === 'setup') { b.x = r3(lp.x); b.y = r3(lp.y); autosave(); } else keyCh(b.name, 'translate', { x: r3(lp.x - b.x), y: r3(lp.y - b.y) });
+  } else if (d.type === 'rot') {
+    const o = ch.world[i], ang = Math.atan2(p.y - o[5], p.x - o[4]) / DEG, pr = Math.atan2(pw[1], pw[0]) / DEG, nr = norm180(ang - pr);
+    if (S.mode === 'setup') { b.rotation = r3(nr); autosave(); } else keyCh(b.name, 'rotate', { value: r3(norm180(nr - b.rotation)) });
+  }
+  d.dirty = 1;
+});
+const endDrag = () => { const d = S.drag; S.drag = null; if (d && d.dirty) renderProps(); };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('wheel', e => {
+  e.preventDefault(); const r = cv.getBoundingClientRect(), { W, H } = view(), px = e.clientX - r.left, py = e.clientY - r.top;
+  const wx = (px - W / 2 - S.cam.x) / S.cam.z, wy = (py - H * .72 - S.cam.y) / S.cam.z;
+  S.cam.z = Math.max(.3, Math.min(10, S.cam.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  S.cam.x = px - W / 2 - wx * S.cam.z; S.cam.y = py - H * .72 - wy * S.cam.z;
+}, { passive: false });
+
+/* ---------- timeline ---------- */
+const tl = $('#tl'), tg = tl.getContext('2d');
+const TL = { pad: 90 };
+function drawTimeline() {
+  const dpr = devicePixelRatio || 1, W = tl.clientWidth, H = tl.clientHeight;
+  if (tl.width !== Math.round(W * dpr) || tl.height !== Math.round(H * dpr)) { tl.width = Math.round(W * dpr); tl.height = Math.round(H * dpr); }
+  tg.setTransform(dpr, 0, 0, dpr, 0, 0); tg.clearRect(0, 0, W, H);
+  const a = curAnim(); tg.font = '11px sans-serif'; tg.textBaseline = 'middle';
+  if (!a) { tg.fillStyle = '#9a9acb'; tg.fillText('ยังไม่มีอนิเมชั่น — กด “+ ใหม่” ที่แถบด้านบน แล้วสลับเป็นโหมด ② อนิเมชั่น', 12, H / 2); return; }
+  const x = t => TL.pad + t / a.duration * (W - TL.pad - 14);
+  tg.strokeStyle = '#ffffff14'; tg.fillStyle = '#9a9acb';
+  const step = a.duration > 4 ? 1 : a.duration > 1.5 ? .5 : .1;
+  for (let t = 0; t <= a.duration + 1e-6; t += step) { tg.beginPath(); tg.moveTo(x(t), 14); tg.lineTo(x(t), H); tg.stroke(); tg.fillText(t.toFixed(step < .5 ? 1 : 1), x(t) + 2, 7); }
+  const rows = [['หมุน', 'rotate'], ['เลื่อน', 'translate'], ['ขยาย', 'scale']], rh = Math.min(30, (H - 18) / 3), tr = a.tracks[S.bone] || {};
+  tg.fillStyle = '#f2b84b'; tg.fillText(S.bone || '', 6, 24);
+  rows.forEach(([l, c], r) => {
+    const y = 20 + r * rh + rh / 2; tg.fillStyle = '#9a9acb'; tg.fillText(l, 6, y + (r === 0 ? 8 : 0));
+    tg.strokeStyle = '#ffffff1a'; tg.beginPath(); tg.moveTo(TL.pad, y); tg.lineTo(W - 14, y); tg.stroke();
+    for (const k of tr[c] || []) { tg.save(); tg.translate(x(k.time), y); tg.rotate(Math.PI / 4); tg.fillStyle = '#f2b84b'; tg.fillRect(-4, -4, 8, 8); tg.restore(); }
+  });
+  tg.strokeStyle = '#ff6b6b'; tg.lineWidth = 2; tg.beginPath(); tg.moveTo(x(S.ch.time), 12); tg.lineTo(x(S.ch.time), H); tg.stroke(); tg.lineWidth = 1;
+}
+function scrub(e) {
+  const a = curAnim(); if (!a) return; const r = tl.getBoundingClientRect(), W = r.width;
+  const t = (e.clientX - r.left - TL.pad) / (W - TL.pad - 14) * a.duration;
+  S.ch.time = Math.max(0, Math.min(a.duration, Math.round(t * 100) / 100)); S.ch.animDone = false; S.ch.pose(0);
+  if (S.mode === 'anim') renderProps();
+}
+let scrubbing = false;
+tl.addEventListener('pointerdown', e => { scrubbing = true; tl.setPointerCapture(e.pointerId); scrub(e); });
+tl.addEventListener('pointermove', e => { if (scrubbing) scrub(e); });
+tl.addEventListener('pointerup', () => scrubbing = false);
+
+/* ---------- main loop ---------- */
+let last = performance.now(), tick = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const ch = S.ch;
+  if (ch) {
+    ch.setupPose = S.mode === 'setup'; ch.physicsOn = S.playing; ch.vx = S.testVx; ch.playing = S.playing;
+    ch.update(S.playing ? dt : 0);
+    drawScene(); drawTimeline();
+    const a = curAnim(), lab = $('#tlabel'); if (lab) lab.textContent = a ? ch.time.toFixed(2) + ' / ' + a.duration + ' s' : '';
+    if (S.playing && S.mode === 'anim' && ++tick % 6 === 0 && S.bone) renderProps();
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- demo art ---------- */
+function art(w, h2, fn) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h2; const x = c.getContext('2d');
+  x.lineWidth = 3; x.lineJoin = 'round'; x.lineCap = 'round'; x.strokeStyle = '#1c1530'; fn(x, w, h2); return c.toDataURL('image/png');
+}
+const fs = (x, col) => { x.fillStyle = col; x.fill(); x.stroke(); };
+function demoProject() {
+  const P = newProject('hero'), img = (n, u) => P.images.push({ name: n, src: u });
+  img('head', art(64, 60, x => {
+    x.beginPath(); x.ellipse(32, 33, 27, 24, 0, 0, 7); fs(x, '#f4cfa6');
+    x.beginPath(); x.ellipse(31, 27, 29, 23, 0, Math.PI, 0); x.lineTo(60, 32); x.quadraticCurveTo(48, 20, 36, 26); x.quadraticCurveTo(24, 22, 6, 34); x.closePath(); fs(x, '#6b3f26');
+    x.beginPath(); x.ellipse(47, 38, 5, 7, 0, 0, 7); fs(x, '#fff'); x.fillStyle = '#1c1530'; x.beginPath(); x.ellipse(48.5, 39, 3, 4.5, 0, 0, 7); x.fill();
+    x.fillStyle = '#ff9aa2aa'; x.beginPath(); x.ellipse(40, 47, 5, 3, 0, 0, 7); x.fill();
+    x.beginPath(); x.moveTo(50, 50); x.quadraticCurveTo(54, 52, 57, 49); x.stroke(); }));
+  const tunic = (c1, c2) => art(44, 48, x => { x.beginPath(); x.roundRect(5, 4, 34, 40, 8); fs(x, c1); x.fillStyle = c2; x.fillRect(5, 30, 34, 6); x.strokeRect(5, 30, 34, 6); });
+  img('tunic_blue', tunic('#3f6fd8', '#f2b84b')); img('tunic_red', tunic('#d84a4a', '#f2b84b'));
+  img('armor', art(44, 48, x => { x.beginPath(); x.roundRect(5, 4, 34, 40, 8); fs(x, '#a9b3c4'); x.fillStyle = '#d9e0ee'; x.fillRect(12, 8, 8, 22); x.fillStyle = '#7a5b2e'; x.fillRect(5, 31, 34, 6); x.strokeRect(5, 31, 34, 6); }));
+  const arm = c => art(16, 38, x => { x.beginPath(); x.roundRect(3, 2, 10, 24, 5); fs(x, c); x.beginPath(); x.arc(8, 30, 5, 0, 7); fs(x, '#f4cfa6'); });
+  img('sleeve_blue', arm('#3f6fd8')); img('sleeve_red', arm('#d84a4a')); img('sleeve_gray', arm('#a9b3c4'));
+  img('leg', art(16, 34, x => { x.beginPath(); x.roundRect(3, 2, 10, 20, 4); fs(x, '#3a3a5c'); x.beginPath(); x.roundRect(1, 22, 15, 10, 4); fs(x, '#7a4a28'); }));
+  const cape = c => art(34, 28, x => { x.beginPath(); x.moveTo(3, 1); x.lineTo(31, 1); x.lineTo(33, 26); x.lineTo(1, 26); x.closePath(); fs(x, c); });
+  img('cape_red', cape('#c8323c')); img('cape_blue', cape('#3258c8'));
+  img('hat_wizard', art(70, 56, x => { x.beginPath(); x.moveTo(35, 2); x.lineTo(58, 44); x.lineTo(12, 44); x.closePath(); fs(x, '#5a3aa8'); x.beginPath(); x.ellipse(35, 46, 33, 7, 0, 0, 7); fs(x, '#4a2f8c'); x.fillStyle = '#f2b84b'; x.fillRect(22, 36, 26, 5); x.strokeRect(22, 36, 26, 5); }));
+  img('helmet', art(62, 44, x => { x.beginPath(); x.ellipse(31, 28, 26, 22, 0, Math.PI, 0); x.lineTo(57, 38); x.lineTo(5, 38); x.closePath(); fs(x, '#a9b3c4'); x.beginPath(); x.moveTo(20, 8); x.quadraticCurveTo(6, -2, 2, 14); x.quadraticCurveTo(14, 8, 24, 16); x.closePath(); fs(x, '#c8323c'); }));
+  img('sword', art(14, 56, x => { x.beginPath(); x.moveTo(7, 2); x.lineTo(12, 14); x.lineTo(12, 40); x.lineTo(2, 40); x.lineTo(2, 14); x.closePath(); fs(x, '#dfe9f7'); x.fillStyle = '#f2b84b'; x.fillRect(0, 40, 14, 5); x.strokeRect(0, 40, 14, 5); x.fillRect(4, 45, 6, 9); x.strokeRect(4, 45, 6, 9); }));
+
+  const sp = ph => ({ stiffness: 55, damping: 5, wind: 6, freq: .6, phase: ph, drag: .08, inertia: .8, limit: 70 });
+  const B = (name, parent, x, y, rot, len, physics) => ({ name, parent, x, y, rotation: rot, scaleX: 1, scaleY: 1, length: len || 30, ...(physics ? { physics } : {}) });
+  P.bones = [B('root', null, 0, 0, 0, 20), B('hip', 'root', 0, -34, 0, 14), B('legB', 'hip', -6, 0, 90, 32), B('legF', 'hip', 6, 0, 90, 32),
+    B('body', 'hip', 0, 0, 0, 20), B('head', 'body', 0, -44, 0, 26), B('armB', 'body', -5, -38, 90, 34), B('armF', 'body', 5, -38, 90, 34),
+    B('capeA', 'body', -16, -40, 90, 24, sp(0)), B('capeB', 'capeA', 24, 0, 0, 24, sp(.9)), B('capeC', 'capeB', 24, 0, 0, 24, sp(1.8))];
+  const A = (name, image, x, y, rot, px, py) => ({ name, image, x, y, rotation: rot, scale: 1, pivotX: px, pivotY: py });
+  const SL = (name, bone, attachments, cur) => ({ name, bone, attachment: cur, attachments });
+  const capes = ['capeC', 'capeB', 'capeA'].map(n => SL(n, n, [A('red', 'cape_red', 0, 0, -90, .5, 0), A('blue', 'cape_blue', 0, 0, -90, .5, 0)], 'red'));
+  const sleeves = n => SL(n, n, [A('blue', 'sleeve_blue', 0, 0, -90, .5, .1), A('red', 'sleeve_red', 0, 0, -90, .5, .1), A('gray', 'sleeve_gray', 0, 0, -90, .5, .1)], 'blue');
+  const leg = n => SL(n, n, [A('default', 'leg', 0, 0, -90, .5, .08)], 'default');
+  P.slots = [...capes, sleeves('armB'), leg('legB'), leg('legF'),
+    SL('body', 'body', [A('blue', 'tunic_blue', 0, 2, 0, .5, 1), A('red', 'tunic_red', 0, 2, 0, .5, 1), A('armor', 'armor', 0, 2, 0, .5, 1)], 'blue'),
+    SL('head', 'head', [A('default', 'head', 0, 0, 0, .5, .92)], 'default'),
+    SL('hat', 'head', [A('wizard', 'hat_wizard', 2, -38, 0, .5, .9), A('helmet', 'helmet', 0, -34, 0, .5, .85)], null),
+    sleeves('armF'), SL('sword', 'armF', [A('default', 'sword', 36, 0, -10, .5, .85)], 'default')];
+  P.outfits = {
+    'นักผจญภัย': { capeA: 'red', capeB: 'red', capeC: 'red', armB: 'blue', armF: 'blue', body: 'blue', hat: null, sword: 'default' },
+    'จอมเวท': { capeA: 'blue', capeB: 'blue', capeC: 'blue', armB: 'red', armF: 'red', body: 'red', hat: 'wizard', sword: null },
+    'อัศวิน': { capeA: 'red', capeB: 'red', capeC: 'red', armB: 'gray', armF: 'gray', body: 'armor', hat: 'helmet', sword: 'default' } };
+  const R = (...kv) => kv.map(([time, value]) => ({ time, value, curve: 'smooth' }));
+  const T = (...kv) => kv.map(([time, x, y]) => ({ time, x, y, curve: 'smooth' }));
+  P.animations = {
+    idle: { duration: 1.6, loop: true, tracks: {
+      body: { translate: T([0, 0, 0], [.8, 0, 1.5], [1.6, 0, 0]) }, head: { rotate: R([0, 0], [.8, 3], [1.6, 0]) },
+      armF: { rotate: R([0, 0], [.8, 4], [1.6, 0]) }, armB: { rotate: R([0, 0], [.8, -4], [1.6, 0]) } } },
+    walk: { duration: .8, loop: true, tracks: {
+      legF: { rotate: R([0, 30], [.4, -30], [.8, 30]) }, legB: { rotate: R([0, -30], [.4, 30], [.8, -30]) },
+      armF: { rotate: R([0, -30], [.4, 30], [.8, -30]) }, armB: { rotate: R([0, 30], [.4, -30], [.8, 30]) },
+      body: { translate: T([0, 0, 0], [.2, 0, -3], [.4, 0, 0], [.6, 0, -3], [.8, 0, 0]), rotate: R([0, 3], [.4, 3], [.8, 3]) } } },
+    attack: { duration: .5, loop: false, tracks: {
+      armF: { rotate: R([0, 0], [.12, 120], [.28, -90], [.5, 0]) }, body: { rotate: R([0, 0], [.12, -6], [.28, 8], [.5, 0]) } } } };
+  return P;
+}
+
+/* ---------- export ---------- */
+function download(name, blob) { const a = h('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+const crcT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = crcT[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  for (const f of files) {
+    const nm = enc.encode(f.name), d = f.data, crc = crc32(d);
+    const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint16(10, 0, true); lh.setUint16(12, 33, true); lh.setUint32(14, crc, true); lh.setUint32(18, d.length, true); lh.setUint32(22, d.length, true); lh.setUint16(26, nm.length, true);
+    parts.push(lh.buffer, nm, d);
+    const ch = new DataView(new ArrayBuffer(46)); ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(14, 33, true); ch.setUint32(16, crc, true); ch.setUint32(20, d.length, true); ch.setUint32(24, d.length, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
+    cen.push(ch.buffer, nm); off += 30 + nm.length + d.length;
+  }
+  const csize = cen.reduce((s, b) => s + b.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, csize, true); end.setUint32(16, off, true);
+  return new Blob([...parts, ...cen, end.buffer], { type: 'application/zip' });
+}
+const dataUrlBytes = u => Uint8Array.from(atob(u.split(',')[1]), c => c.charCodeAt(0));
+
+const GAME_DEMO = `<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game demo</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#12122a;color:#fff;font:14px system-ui,sans-serif}canvas{display:block;width:100%;height:100%}#hud{position:fixed;left:10px;top:8px;opacity:.85;white-space:pre-line}</style></head>
+<body><canvas id="c"></canvas><div id="hud"></div>
+\x3cscript src="rigger-runtime.js">\x3c/script>
+\x3cscript src="character.data.js">\x3c/script>
+\x3cscript>
+(async () => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d'), hud = document.getElementById('hud');
+  const rig = await Rigger.load(window.CHARACTER_DATA);          // หรือ Rigger.load('character.json') เมื่อรันผ่านเซิร์ฟเวอร์
+  const hero = rig.spawn({ x: 0, y: 0, scale: 2 });
+  const has = n => !!rig.data.animations[n];
+  const outfits = rig.outfitNames(); let oi = -1, attacking = false, vy = 0, jumpY = 0;
+  hero.onComplete = n => { if (n === 'attack') attacking = false; };
+  const keys = {};
+  addEventListener('keydown', e => { keys[e.code] = true;
+    if (e.code === 'KeyO' && outfits.length) { oi = (oi + 1) % outfits.length; hero.equipOutfit(outfits[oi]); }
+    if ((e.code === 'KeyJ' || e.code === 'KeyZ') && has('attack') && !attacking) { attacking = true; hero.play('attack', { loop: false, restart: true }); }
+    if (e.code === 'Space' && jumpY === 0) vy = -520; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
+  addEventListener('keyup', e => keys[e.code] = false);
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const W = cv.width = innerWidth, H = cv.height = innerHeight, groundY = H * 0.75;
+    let dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+    hero.vx = dir * 240; hero.x += hero.vx * dt; if (dir) hero.facing = dir;
+    vy += 1600 * dt; jumpY += vy * dt; if (jumpY > 0) { jumpY = 0; vy = 0; } hero.y = jumpY;
+    if (!attacking) hero.play(dir && has('walk') ? 'walk' : (has('idle') ? 'idle' : rig.animationNames()[0]));
+    hero.update(dt);
+    ctx.fillStyle = '#12122a'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2 - hero.x, groundY);
+    ctx.strokeStyle = '#ffffff22'; for (let x = Math.floor((hero.x - W) / 100) * 100; x < hero.x + W; x += 100) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 12); ctx.stroke(); }
+    ctx.strokeStyle = '#f2b84b'; ctx.beginPath(); ctx.moveTo(hero.x - W, 0); ctx.lineTo(hero.x + W, 0); ctx.stroke();
+    hero.draw(ctx); ctx.restore();
+    hud.textContent = '← → / A D เดิน   Space กระโดด   J โจมตี   O เปลี่ยนชุด' + (outfits.length ? '  (' + (oi < 0 ? 'ชุดเริ่มต้น' : outfits[oi]) + ')' : '');
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})().catch(e => { document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;padding:12px">' + e + '</pre>'); });
+\x3c/script></body></html>
+`;
+
+function buildReadme() {
+  const P = S.project, F = '`'.repeat(3);
+  const bones = P.bones.map(b => b.name + (b.physics ? ' (spring)' : '')).join(', ');
+  const slots = P.slots.map(s => `- ${s.name} (bone ${s.bone}): ${s.attachments.map(a => a.name).join(' | ')}   default=${s.attachment}`).join('\n');
+  const outs = Object.keys(P.outfits).map(n => `- "${n}"`).join('\n') || '- (none)';
+  const anims = Object.entries(P.animations).map(([n, a]) => `- "${n}" ${a.duration}s ${a.loop === false ? 'once' : 'loop'}`).join('\n') || '- (none)';
+  return `# ${P.name} — character package (Character Rigger)
+
+2D skeletal puppet character for the web browser (Canvas 2D, no dependencies).
+
+## Files
+- rigger-runtime.js  — runtime (global \`Rigger\`)
+- character.json     — rig + animations + outfits (images referenced from images/)
+- images/*.png       — body part images
+- character.data.js  — same data with images embedded (\`window.CHARACTER_DATA\`) so it works from file://
+- game-demo.html     — minimal playable example (arrows move, Space jump, J attack, O outfit)
+
+## Quick use
+${F}html
+<canvas id="c"></canvas>
+\x3cscript src="rigger-runtime.js">\x3c/script>
+\x3cscript src="character.data.js">\x3c/script>
+\x3cscript>
+(async () => {
+  const ctx = document.getElementById('c').getContext('2d');
+  const rig  = await Rigger.load(window.CHARACTER_DATA);   // or Rigger.load('character.json') over http
+  const hero = rig.spawn({ x: 200, y: 400, scale: 2 });    // (x,y) = feet position, y grows downward
+  hero.play('idle');
+  let last = performance.now();
+  (function loop(now) {
+    const dt = (now - last) / 1000; last = now;
+    hero.vx = 0;               // px/s horizontal velocity: drives cape/hair physics
+    hero.update(dt);
+    ctx.clearRect(0, 0, 800, 600);
+    hero.draw(ctx);
+    requestAnimationFrame(loop);
+  })(last);
+})();
+\x3c/script>
+${F}
+
+## API (Character)
+- fields: x, y, scale, facing (1 right / -1 left), vx, vy (vx is used by spring physics), speed, physicsOn
+- play(name, {loop, speed, restart})   — switch animation; no-op restart if already playing unless restart:true
+- onComplete = name => {}              — called when a non-looping animation ends
+- equip(slot, attachment) / unequip(slot) / unequipAll() / equipOutfit(outfitName) / getOutfit()
+- update(dt) / draw(ctx)               — draw(ctx) respects the ctx's current transform (camera)
+- boneWorld(name) -> {x, y, rotation}  — world position of a bone, e.g. to spawn effects at "armF"
+- pick(x, y) -> slot index or -1       — hit test in world coordinates
+- Rigger.load(urlOrObject, {basePath}) -> Promise<Rig>; rig.spawn(opts); rig.animationNames(); rig.outfitNames()
+
+## This character
+Bones: ${bones}
+
+Slots (draw order back -> front):
+${slots}
+
+Outfits:
+${outs}
+
+Animations:
+${anims}
+`;
+}
+function exportPackage() {
+  if (!S.project.slots.length) return toast('ยังไม่มีสลอต — เพิ่มชิ้นส่วนก่อน');
+  const P = JSON.parse(JSON.stringify(S.project)), enc = new TextEncoder(), files = [];
+  const embedded = JSON.stringify(P);
+  P.images.forEach(im => { files.push({ name: 'images/' + im.name + '.png', data: dataUrlBytes(im.src) }); im.src = 'images/' + im.name + '.png'; });
+  files.unshift({ name: 'character.json', data: enc.encode(JSON.stringify(P, null, 1)) });
+  files.push({ name: 'character.data.js', data: enc.encode('window.CHARACTER_DATA = ' + embedded + ';\n') });
+  files.push({ name: 'rigger-runtime.js', data: enc.encode($('#rt').textContent.trim() + '\n') });
+  files.push({ name: 'game-demo.html', data: enc.encode(GAME_DEMO) });
+  files.push({ name: 'README.md', data: enc.encode(buildReadme()) });
+  download((S.project.name || 'character') + '-game-package.zip', makeZip(files));
+  toast('ส่งออกแพ็คเกจแล้ว — แตก zip แล้วเปิด game-demo.html ได้เลย');
+}
+function claudePrompt() {
+  return `ช่วยต่อยอดเป็นเกมเว็บเบราว์เซอร์ (HTML + Canvas + JavaScript ล้วน) โดยใช้ตัวละครจากแพ็คเกจ Character Rigger ที่แนบมา\n` +
+    `- ใช้ rigger-runtime.js + character.data.js ตามตัวอย่างใน game-demo.html (อย่าแก้ runtime)\n` +
+    `- เกมที่ต้องการ: [ระบุ เช่น เกมแพลตฟอร์มวิ่งเก็บเหรียญ / ต่อสู้มอนสเตอร์]\n\n` + buildReadme();
+}
+
+/* ---------- wiring ---------- */
+$('#mSetup').onclick = () => { S.mode = 'setup'; S.ch.setupPose = true; S.ch.pose(0); renderModeBar(); renderProps(); };
+$('#mAnim').onclick = () => { S.mode = 'anim'; S.ch.setupPose = false; S.ch.pose(0); renderModeBar(); renderProps(); };
+$('#cBones').onchange = e => S.showBones = e.target.checked;
+$('#rVx').oninput = e => S.testVx = +e.target.value;
+$('#pname').onchange = e => { S.project.name = e.target.value.trim() || 'character'; autosave(); };
+$('#bNew').onclick = () => { if (confirm('เริ่มโปรเจกต์ใหม่? (งานเดิมที่ยังไม่ได้บันทึกจะหาย)')) setProject(newProject()); };
+$('#bDemo').onclick = () => { if (confirm('โหลดตัวอย่าง? (งานเดิมที่ยังไม่ได้บันทึกจะถูกแทนที่)')) setProject(demoProject()); };
+$('#bOpen').onclick = () => $('#fOpen').click();
+$('#fOpen').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const p = JSON.parse(await f.text()); if (!p.bones || !p.slots) throw 0; p.outfits = p.outfits || {}; p.animations = p.animations || {}; p.images = p.images || []; await setProject(p); }
+  catch (err) { toast('ไฟล์โปรเจกต์ไม่ถูกต้อง'); }
+};
+$('#bSave').onclick = () => download((S.project.name || 'character') + '.rigger.json', new Blob([JSON.stringify(S.project)], { type: 'application/json' }));
+$('#bPack').onclick = exportPackage;
+$('#bPrompt').onclick = async () => { const t = claudePrompt(); try { await navigator.clipboard.writeText(t); toast('คัดลอกแล้ว — วางให้ Claude พร้อมแนบไฟล์ zip'); } catch (e) { prompt('คัดลอกข้อความนี้', t); } };
+addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); } });
+
+(async () => {
+  let p = null; try { p = JSON.parse(localStorage.getItem('rigger-project')); } catch (e) {}
+  await setProject(p && p.bones && p.slots ? p : demoProject());
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
