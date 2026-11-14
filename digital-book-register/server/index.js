@@ -57,6 +57,12 @@ function createApp() {
     const b = req.body || {}; const old = db.getSettings(); const out = {};
     const str = (k, max = 200) => { if (b[k] !== undefined) { const v = String(b[k]).trim(); if (v.length > max) throw new U.HttpError(400, `${k} ยาวเกินไป`); out[k] = v; } };
     ['org_name', 'dept_name'].forEach(k => str(k)); ['duty_title', 'duty_unit'].forEach(k => str(k, 100));
+    for (const k of ['from_options', 'to_options']) {
+      if (b[k] === undefined) continue;
+      const arr = (Array.isArray(b[k]) ? b[k] : String(b[k]).split('\n')).map(x => String(x).trim()).filter(Boolean);
+      if (arr.length > 50 || arr.some(x => x.length > 300)) throw new U.HttpError(400, 'รายการหน่วยงานไม่ถูกต้อง (ไม่เกิน 50 รายการ)');
+      out[k] = JSON.stringify([...new Set(arr)]);
+    }
     if (b.duty_officers !== undefined) {
       const arr = (Array.isArray(b.duty_officers) ? b.duty_officers : String(b.duty_officers).split('\n')).map(x => String(x).trim()).filter(Boolean);
       if (arr.length > 30 || arr.some(x => x.length > 100)) throw new U.HttpError(400, 'รายชื่อผู้เข้าเวรไม่ถูกต้อง (ไม่เกิน 30 คน คนละไม่เกิน 100 ตัวอักษร)');
@@ -64,7 +70,7 @@ function createApp() {
     }
     if (b.year_mode !== undefined) {
       const v = String(b.year_mode).trim();
-      if (v !== 'auto' && !/^(24|25|26)\d{2}$/.test(v)) throw new U.HttpError(400, 'ปี พ.ศ. ไม่ถูกต้อง (ใส่ auto หรือปี เช่น 2569)');
+      if (v !== 'auto' && v !== 'fiscal' && !/^(24|25|26)\d{2}$/.test(v)) throw new U.HttpError(400, 'ปี พ.ศ. ไม่ถูกต้อง (ใส่ auto, fiscal หรือปี เช่น 2570)');
       out.year_mode = v;
     }
     if (b.reg_format !== undefined) {

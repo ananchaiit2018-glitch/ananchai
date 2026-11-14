@@ -81,7 +81,8 @@ function thaiDatePicker(value) {
       if (dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return '';
       return `${yy}-${p2(mm)}-${p2(dd)}`;
     },
-    today() { api_.set(todayISO()); }, onChange(fn) { [d, m, y].forEach(x => x.addEventListener('change', fn)); },
+    today() { api_.set(todayISO()); },
+    presetMonthYear() { const t = todayISO().split('-').map(Number); m.value = t[1]; y.value = t[0] + 543; }, onChange(fn) { [d, m, y].forEach(x => x.addEventListener('change', fn)); },
   };
   api_.set(value === undefined ? '' : value);
   void yearBE; return api_;

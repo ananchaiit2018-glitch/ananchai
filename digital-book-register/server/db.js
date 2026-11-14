@@ -93,12 +93,14 @@ function tx(fn) {
 }
 
 const DEFAULTS = {
+  from_options: JSON.stringify(['ผบ.ร้อย ฉก.ตชด ๔๔๔']),
+  to_options: JSON.stringify(['ผบ.มว.ฉก.ตชด.๔๔๔๑']),
   duty_title: 'ผู้เข้าเวร วิทยุ',
   duty_unit: 'ประจำ มว.ฉก.ตชด.๔๔๔๑',
   duty_officers: JSON.stringify(['ส.ต.ท.อนันต์ชัย แก้วหัวไทร', 'ส.ต.ท.เนวิน แดงแจ้', 'ส.ต.ท.ซูไฮมีย์ บาฮา']),
   org_name: '',
   dept_name: '',
-  year_mode: 'auto',       // auto = ใช้ปี พ.ศ. ตามวันที่ของเครื่อง / หรือระบุปีเอง เช่น 2569
+  year_mode: 'fiscal',       // auto = ใช้ปี พ.ศ. ตามวันที่ของเครื่อง / หรือระบุปีเอง เช่น 2569
   reg_format: '{no}/{year}',
   reg_pad: '3',
   start_in: '1',

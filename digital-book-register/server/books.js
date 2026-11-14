@@ -19,6 +19,7 @@ const MAX_LEN = { subject: 1000, remark: 1000, default: 300 };
 function registrationYear(settings = db.getSettings()) {
   const m = String(settings.year_mode || 'auto');
   if (/^\d{4}$/.test(m)) return parseInt(m, 10);
+  if (m === 'fiscal') { const d = new Date(); return d.getFullYear() + 543 + (d.getMonth() >= 9 ? 1 : 0); }   // ปีงบประมาณ เริ่ม 1 ต.ค.
   return U.currentBuddhistYear();
 }
 function label(no, year, s) { return U.formatRegNo(no, year, s.reg_format, parseInt(s.reg_pad, 10) || 0); }

@@ -14,6 +14,16 @@ const jj = async (p, o = {}) => {
 test.before(async () => { db.open(); await new Promise(r => { server = createApp().listen(0, '127.0.0.1', r); }); base = 'http://127.0.0.1:' + server.address().port; });
 test.after(() => { server.closeAllConnections(); server.close(); db.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
+test('ปีงบประมาณ(ค่าตั้งต้น) และค่าตั้งต้นช่อง จาก/ถึง', async () => {
+  const d = new Date(); const exp = d.getFullYear() + 543 + (d.getMonth() >= 9 ? 1 : 0);
+  const st = (await jj('/api/state')).d; assert.equal(st.settings.year_mode, 'fiscal'); assert.equal(st.year, exp);
+  assert.deepEqual(JSON.parse(st.settings.to_options), ['ผบ.มว.ฉก.ตชด.๔๔๔๑']); assert.deepEqual(JSON.parse(st.settings.from_options), ['ผบ.ร้อย ฉก.ตชด ๔๔๔']);
+  const r = await jj('/api/books/in', { json: { book_date: '2026-03-05', subject: 'งบ' } }); assert.equal(r.d.reg_label, '001/' + exp);
+  assert.equal((await jj('/api/settings', { method: 'PUT', json: { year_mode: 'auto', from_options: 'ก\nข' } })).s, 200);
+  assert.equal((await jj('/api/settings', { method: 'PUT', json: { year_mode: 'xyz' } })).s, 400);
+  assert.deepEqual(JSON.parse((await jj('/api/state')).d.settings.from_options), ['ก', 'ข']);
+  await jj('/api/settings', { method: 'PUT', json: { year_mode: 'fiscal' } });
+});
 test('ผู้เข้าเวร: ค่าเริ่มต้น 3 คน / แก้รายชื่อได้ / ประวัติบันทึกชื่อผู้ทำรายการ', async () => {
   const st = (await jj('/api/state')).d.settings; const list = JSON.parse(st.duty_officers);
   assert.deepEqual(list, ['ส.ต.ท.อนันต์ชัย แก้วหัวไทร', 'ส.ต.ท.เนวิน แดงแจ้', 'ส.ต.ท.ซูไฮมีย์ บาฮา']);

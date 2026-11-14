@@ -103,3 +103,4 @@ table.t tr.cancelled td.nostrike{text-decoration:none}
   .main{padding:12px}
 }
 @media (max-width:560px){.g4,.g3,.g2{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
+.timesel{display:inline-flex;align-items:center;gap:4px}.timesel select{width:78px;padding-left:8px}
