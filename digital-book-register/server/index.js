@@ -57,7 +57,7 @@ function createApp() {
     const b = req.body || {}; const old = db.getSettings(); const out = {};
     const str = (k, max = 200) => { if (b[k] !== undefined) { const v = String(b[k]).trim(); if (v.length > max) throw new U.HttpError(400, `${k} ยาวเกินไป`); out[k] = v; } };
     ['org_name', 'dept_name'].forEach(k => str(k)); ['duty_title', 'duty_unit'].forEach(k => str(k, 100));
-    for (const k of ['from_options', 'to_options']) {
+    for (const k of ['from_options', 'to_options', 'book_no_prefixes']) {
       if (b[k] === undefined) continue;
       const arr = (Array.isArray(b[k]) ? b[k] : String(b[k]).split('\n')).map(x => String(x).trim()).filter(Boolean);
       if (arr.length > 50 || arr.some(x => x.length > 300)) throw new U.HttpError(400, 'รายการหน่วยงานไม่ถูกต้อง (ไม่เกิน 50 รายการ)');

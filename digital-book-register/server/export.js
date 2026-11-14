@@ -43,7 +43,7 @@ function titleOf(kind) { return kind === 'in' ? 'ทะเบียนหนั�
 async function makePdf(q) {
   const { p, kind, line, dateParts } = resolveScope(q);
   const rows = books.listForExport(p);
-  return pdf.build({ dateParts, kind, rows, settings: db.getSettings(), titleLine: line, color: q.color !== '0', withFrom: q.withFrom === '1', pageBy: q.pageBy === 'day' ? 'day' : 'continuous' });
+  return pdf.build({ dateParts, kind, rows, settings: db.getSettings(), titleLine: line, color: q.color === '1', withFrom: q.withFrom === '1', pageBy: q.pageBy === 'day' ? 'day' : 'continuous' });
 }
 
 async function makeXlsx(q) {
@@ -51,7 +51,7 @@ async function makeXlsx(q) {
   const rows = books.listForExport(p);
   const s = db.getSettings();
   const fam = (fonts.status().regular || {}).family || undefined;   // ใช้ชื่อฟอนต์จากไฟล์ที่นำเข้าเท่านั้น
-  const color = q.color !== '0' ? 'FF' + (s.data_color || '#174EA6').slice(1).toUpperCase() : 'FF000000';
+  const color = q.color === '1' ? 'FF' + (s.data_color || '#174EA6').slice(1).toUpperCase() : 'FF000000';
   const wb = new ExcelJS.Workbook();
   wb.creator = s.org_name || 'Digital Book Register';
   const ws = wb.addWorksheet(titleOf(kind), { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });

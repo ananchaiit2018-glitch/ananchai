@@ -15,21 +15,21 @@ const PAD = 3;
 const COLS = {
   in: [
     { key: 'reg_label', title: 'เลขทะเบียนรับ', w: 90, align: 'center' },
-    { key: 'book_no', title: 'ที่', w: 100 },
+    { key: 'book_no', title: 'ที่', w: 165 },
     { key: 'book_date', title: 'ลงวันที่', w: 105, align: 'center' },
-    { key: 'from_org', title: 'จาก', w: 105 },
-    { key: 'to_org', title: 'ถึง', w: 105 },
-    { key: 'subject', title: 'เรื่อง', w: 240 },
-    { key: 'action', title: 'การปฏิบัติ', w: 130 },
-    { key: 'remark', title: 'หมายเหตุ', w: 110 },
+    { key: 'from_org', title: 'จาก', w: 118 },
+    { key: 'to_org', title: 'ถึง', w: 118 },
+    { key: 'subject', title: 'เรื่อง', w: 200 },
+    { key: 'action', title: 'การปฏิบัติ', w: 100 },
+    { key: 'remark', title: 'หมายเหตุ', w: 95 },
   ],
   out: [
     { key: 'reg_label', title: 'เลขทะเบียนส่ง', w: 90, align: 'center' },
-    { key: 'book_no', title: 'ที่', w: 110 },
+    { key: 'book_no', title: 'ที่', w: 170 },
     { key: 'book_date', title: 'ลงวันที่', w: 105, align: 'center' },
     { key: 'from_org', title: 'จาก', w: 105, optional: true },
     { key: 'to_org', title: 'ถึง', w: 125 },
-    { key: 'subject', title: 'เรื่อง', w: 250 },
+    { key: 'subject', title: 'เรื่อง', w: 225 },
     { key: 'action', title: 'การปฏิบัติ', w: 120 },
     { key: 'remark', title: 'หมายเหตุ', w: 100 },
   ],
@@ -211,7 +211,6 @@ function build(opts) {
     [pd.d, pd.m, pd.y].forEach((val, k) => { if (val && slots[k]) doc.text(val, slots[k].x - 4, slots[k].y, { width: slots[k].w + 8, align: 'center', lineBreak: false }); });
     doc.font('Reg').fontSize(size - 2).fillColor('#000');
     doc.text(`หน้า ${i + 1} / ${range.count}`, M.left, PAGE.h - M.bottom + 10, { width: tableW, align: 'right', lineBreak: false });
-    doc.text(`พิมพ์เมื่อ ${U.thaiDateTime(U.nowLocal())}`, M.left, PAGE.h - M.bottom + 10, { width: tableW / 2, align: 'left', lineBreak: false });
   }
   doc.end();
   return done;

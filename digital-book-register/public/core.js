@@ -64,28 +64,43 @@ function promptBox(title, label, okText = 'ตกลง') {
   });
 }
 
-/* ---------- ช่องเลือกวันที่ (พ.ศ.) ---------- */
+/* ---------- ช่องเลือกวันที่: ปฏิทินป๊อปอัป (แสดงปี พ.ศ.) ---------- */
 function thaiDatePicker(value) {
-  const el = document.createElement('div'); el.className = 'thdate';
-  const yearBE = new Date().getFullYear() + 543;
-  el.innerHTML = `<input type="number" min="1" max="31" placeholder="วัน" inputmode="numeric" aria-label="วัน" class="ink">
-    <select aria-label="เดือน" class="ink"><option value="">เดือน</option>${MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select>
-    <input type="number" min="2400" max="2700" placeholder="พ.ศ." inputmode="numeric" aria-label="ปี พ.ศ." class="ink">`;
-  const [d, m, y] = [el.children[0], el.children[1], el.children[2]];
+  const el = document.createElement('div'); el.className = 'cal-wrap';
+  el.innerHTML = '<button type="button" class="cal-btn ink"><span class="cal-text">เลือกวันที่</span><span>📅</span></button><div class="cal-pop" hidden></div>';
+  const btn = el.children[0], pop = el.children[1], txt = btn.children[0];
+  const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  let val = ''; let view = new Date(); view.setDate(1); const cbs = [];
+  const label = () => { txt.textContent = val ? fmtDate(val) : 'เลือกวันที่'; txt.classList.toggle('muted', !val); };
+  const draw = () => {
+    const y = view.getFullYear(), m = view.getMonth(), first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), today = todayISO();
+    let cells = ''; for (let i = 0; i < first; i++) cells += '<span></span>';
+    for (let d = 1; d <= days; d++) { const iso = `${y}-${p2(m + 1)}-${p2(d)}`; cells += `<button type="button" class="cal-d ${iso === val ? 'sel' : ''} ${iso === today ? 'today' : ''}" data-d="${iso}">${d}</button>`; }
+    pop.innerHTML = `<div class="cal-head"><button type="button" class="btn sm" data-y="-1" title="ปีก่อน">«</button><button type="button" class="btn sm" data-m="-1" title="เดือนก่อน">‹</button><b>${MONTHS[m]} ${y + 543}</b><button type="button" class="btn sm" data-m="1" title="เดือนถัดไป">›</button><button type="button" class="btn sm" data-y="1" title="ปีถัดไป">»</button></div>
+      <div class="cal-grid">${DOW.map(x => `<i>${x}</i>`).join('')}${cells}</div><div class="cal-foot"><button type="button" class="btn sm" data-today="1">วันนี้</button><button type="button" class="btn sm" data-clear="1">ล้าง</button></div>`;
+  };
+  const close = () => { pop.hidden = true; };
+  const open = () => { if (val) { const [yy, mm] = val.split('-').map(Number); view = new Date(yy, mm - 1, 1); } draw(); pop.hidden = false; };
+  const fire = () => cbs.forEach(f => f());
+  btn.addEventListener('click', e => { e.stopPropagation(); pop.hidden ? open() : close(); });
+  pop.addEventListener('click', e => {
+    e.stopPropagation(); const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.d) { val = t.dataset.d; label(); close(); fire(); }
+    else if (t.dataset.m) { view = new Date(view.getFullYear(), view.getMonth() + Number(t.dataset.m), 1); draw(); }
+    else if (t.dataset.y) { view = new Date(view.getFullYear() + Number(t.dataset.y), view.getMonth(), 1); draw(); }
+    else if (t.dataset.today) { val = todayISO(); label(); close(); fire(); }
+    else if (t.dataset.clear) { val = ''; label(); close(); fire(); }
+  });
+  document.addEventListener('click', ev => { if (!el.isConnected) return; if (!el.contains(ev.target)) close(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
   const api_ = {
-    el,
-    set(iso) { if (/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) { const [yy, mm, dd] = iso.split('-').map(Number); d.value = dd; m.value = mm; y.value = yy + 543; } else { d.value = ''; m.value = ''; y.value = ''; } },
-    get() {
-      if (!d.value || !m.value || !y.value) return '';
-      const yy = +y.value - 543, mm = +m.value, dd = +d.value, dt = new Date(yy, mm - 1, dd);
-      if (dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return '';
-      return `${yy}-${p2(mm)}-${p2(dd)}`;
-    },
-    today() { api_.set(todayISO()); },
-    presetMonthYear() { const t = todayISO().split('-').map(Number); m.value = t[1]; y.value = t[0] + 543; }, onChange(fn) { [d, m, y].forEach(x => x.addEventListener('change', fn)); },
+    el, get: () => val,
+    set(iso) { val = /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso : ''; if (val) { const [yy, mm] = val.split('-').map(Number); view = new Date(yy, mm - 1, 1); } label(); },
+    today() { api_.set(todayISO()); }, presetMonthYear() { view = new Date(); view.setDate(1); },
+    onChange(fn) { cbs.push(fn); },
   };
   api_.set(value === undefined ? '' : value);
-  void yearBE; return api_;
+  return api_;
 }
 
 /* ---------- ช่องเซ็นลายเซ็นบนหน้าจอ (เมาส์/นิ้ว/ปากกา) ---------- */

@@ -93,6 +93,7 @@ function tx(fn) {
 }
 
 const DEFAULTS = {
+  book_no_prefixes: JSON.stringify(['นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/']),   // ตัวนำหน้า "ที่" (พิมพ์เฉพาะเลขหลัง /)
   from_options: JSON.stringify(['ผบ.ร้อย ฉก.ตชด ๔๔๔']),
   to_options: JSON.stringify(['ผบ.มว.ฉก.ตชด.๔๔๔๑']),
   duty_title: 'ผู้เข้าเวร วิทยุ',
@@ -105,7 +106,7 @@ const DEFAULTS = {
   reg_pad: '3',
   start_in: '1',
   start_out: '1',
-  ui_font_size: '20',
+  ui_font_size: '24',
   print_font_size: '16',
   data_color: '#174EA6',
   logo: '',

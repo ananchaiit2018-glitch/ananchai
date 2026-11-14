@@ -68,6 +68,15 @@ async function viewDashboard() {
   $$('tr.click', m).forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id));
 }
 
+/* ---------- ช่องเลือกจากรายการ (+ พิมพ์เอง) ---------- */
+function choiceHtml(id, options, current, ph) {
+  const other = !!current && !options.includes(current);
+  return `<select id="${id}_sel" class="ink"><option value="">— เลือก —</option>${options.map(o => `<option value="${esc(o)}" ${o === current ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other" ${other ? 'selected' : ''}>อื่นๆ (พิมพ์เอง)…</option></select>
+    <input type="text" id="${id}" class="ink" style="margin-top:6px" placeholder="${esc(ph)}" value="${other ? esc(current) : ''}" ${other ? '' : 'hidden'}>`;
+}
+function wireChoice(id) { const sel = $('#' + id + '_sel'), inp = $('#' + id); sel.onchange = () => { inp.hidden = sel.value !== '__other'; if (!inp.hidden) inp.focus(); }; }
+const getChoice = id => { const sel = $('#' + id + '_sel'); return sel.value === '__other' ? $('#' + id).value.trim() : sel.value; };
+
 /* ---------- ฟอร์มเพิ่ม / แก้ไข ---------- */
 async function viewForm(kind, editId) {
   const m = shell(editId ? '' : 'new/' + kind);
@@ -86,6 +95,12 @@ async function viewForm(kind, editId) {
   for (const f of ['from_org', 'to_org']) sug[f] = [...new Set([...fromOpts, ...toOpts, ...sug[f]])];
   const actOpts = [...new Set(officers().map(shortName))]; const actCur = edit ? edit.action : shortName(getDuty());
   if (actCur && !actOpts.includes(actCur)) actOpts.push(actCur);
+  const orgOpts = f => [...new Set([...fromOpts, ...toOpts, ...(sug[f] || [])])].slice(0, 60);
+  const prefixes = jl('book_no_prefixes');
+  let preSel = '__custom', sufVal = '';
+  { const cur = edit ? edit.book_no : '';
+    if (!edit) preSel = prefixes[0] || '__custom';
+    else { const mt = prefixes.filter(x => cur.startsWith(x)).sort((x, y) => y.length - x.length)[0]; if (mt) { preSel = mt; sufVal = cur.slice(mt.length); } else sufVal = cur; } }
   const dl = f => `<datalist id="dl-${f}">${sug[f].map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
   const v = f => esc(edit ? edit[f] : '');
   const recvOptions = [...new Set(officers().map(shortName))];
@@ -99,24 +114,29 @@ async function viewForm(kind, editId) {
     <form class="card" id="f" autocomplete="off">
       <div class="regbox"><div>เลขทะเบียน${isIn ? 'รับ' : 'ส่ง'}</div><b>${edit ? esc(edit.reg_label) : esc(next.label)}</b>
         <small class="muted">${edit ? 'เลขทะเบียนแก้ไขไม่ได้' : 'ระบบออกเลขให้อัตโนมัติเมื่อกดบันทึก (เลขจริงอาจเปลี่ยนถ้ามีเครื่องอื่นบันทึกก่อน)'} · ไม่ใช่เลขที่หนังสือราชการ</small></div>
-      <div class="grid g3"><div class="field"><label class="f">ที่ <small>(เลขที่หนังสือ${isIn ? 'จากหน่วยงานต้นทาง' : 'ราชการ'})</small></label><input type="text" id="book_no" class="ink" value="${v('book_no')}" maxlength="300"></div>
-        <div class="field"><label class="f">ลงวันที่ <span class="muted">*</span></label><div id="book_date_w"></div></div>
-        <div class="field"><label class="f">การปฏิบัติ <small>(ชื่อผู้บันทึก)</small></label><select id="action" class="ink">${actOpts.map(n => `<option value="${esc(n)}" ${n === actCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div></div>
-      <div class="grid g2"><div class="field"><label class="f">จาก</label><input type="text" id="from_org" class="ink" list="dl-from_org" value="${edit ? v('from_org') : esc(defFrom)}"></div>
-        <div class="field"><label class="f">ถึง</label><input type="text" id="to_org" class="ink" list="dl-to_org" value="${edit ? v('to_org') : esc(defTo)}"></div></div>
+      <div class="grid g2"><div class="field"><label class="f">ที่ <small>(เลือกตัวนำหน้า แล้วพิมพ์เฉพาะเลขหลัง / )</small></label>
+          <div style="display:flex;gap:8px"><select id="book_pre" class="ink" style="flex:3 1 0;min-width:0">${prefixes.map(x => `<option value="${esc(x)}" ${x === preSel ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__custom" ${preSel === '__custom' ? 'selected' : ''}>พิมพ์เลขที่เอง (ไม่มีตัวนำหน้า)</option></select>
+            <input type="text" id="book_suf" class="ink" style="flex:1 1 0;min-width:96px" value="${esc(sufVal)}" maxlength="200"></div></div>
+        <div class="field"><label class="f">ลงวันที่ <span class="muted">*</span></label><div id="book_date_w"></div></div></div>
+      <div class="grid g3"><div class="field"><label class="f">การปฏิบัติ <small>(ชื่อผู้บันทึก)</small></label><select id="action" class="ink">${actOpts.map(n => `<option value="${esc(n)}" ${n === actCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+        <div class="field"><label class="f">จาก</label>${choiceHtml('from_org', orgOpts('from_org'), edit ? edit.from_org : defFrom, 'พิมพ์ชื่อหน่วยงานต้นทาง')}</div>
+        <div class="field"><label class="f">ถึง</label>${choiceHtml('to_org', orgOpts('to_org'), edit ? edit.to_org : defTo, 'พิมพ์ชื่อหน่วยงานปลายทาง')}</div></div>
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
       <div class="grid">${sigBlock('receiver')}</div>
       <div class="field"><label class="f">แนบไฟล์ <small>(PDF, JPG, PNG — ไม่เกิน 20 MB ต่อไฟล์)</small></label>
         <input type="file" id="files" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
         <div id="existing_att">${edit ? edit.attachments.map(a => `<div class="att" data-aid="${a.id}"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small><button type="button" class="btn sm danger" data-rm="${a.id}">ลบ</button></div>`).join('') : ''}</div></div>
-      ${dl('from_org')}${dl('to_org')}${dl('receiver_name')}
+      ${dl('receiver_name')}
       <div class="row" style="margin-top:14px"><button class="btn primary big" id="save" type="submit">💾 บันทึก${edit ? 'การแก้ไข' : ''}</button>
         <a class="btn big" href="#/${edit ? 'list/' + kind : 'dashboard'}">ยกเลิก</a><span class="muted" id="msg"></span></div>
     </form>`;
 
   const bd = thaiDatePicker(edit ? edit.book_date : '');
   const prefillAt = !edit; $('#book_date_w').append(bd.el); if (!edit) bd.presetMonthYear();
+  wireChoice('from_org'); wireChoice('to_org');
+  const syncPre = () => { $('#book_suf').placeholder = $('#book_pre').value === '__custom' ? 'พิมพ์เลขที่เต็ม' : 'เลขหลัง /'; }; $('#book_pre').onchange = () => { syncPre(); $('#book_suf').focus(); }; syncPre();
+  const bookNo = () => { const suf = $('#book_suf').value.trim(); return suf ? (($('#book_pre').value === '__custom' ? '' : $('#book_pre').value) + suf) : ''; };
   const dt = {};
   const setT = (w, v) => { const [h, mi] = (v || '').split(':'); $(`#${w}_hh`).value = h || ''; $(`#${w}_mm`).value = mi || ''; };
   const getT = w => ($(`#${w}_hh`).value && $(`#${w}_mm`).value) ? `${$(`#${w}_hh`).value}:${$(`#${w}_mm`).value}` : '';
@@ -140,8 +160,8 @@ async function viewForm(kind, editId) {
     ev.preventDefault(); if (saving) return;
     const g = id => $('#' + id).value.trim();
     if (!g('subject')) { toast('กรุณากรอก "เรื่อง"', 'err'); $('#subject').focus(); return; }
-    if (!bd.get()) { toast('กรุณาระบุ "ลงวันที่" ให้ครบและถูกต้อง (วัน เดือน ปี พ.ศ.)', 'err'); return; }
-    const body = { book_no: g('book_no'), book_date: bd.get(), from_org: g('from_org'), to_org: g('to_org'), subject: g('subject'), action: g('action'), remark: g('remark'), receiver_name: g('receiver_name') };
+    if (!bd.get()) { toast('กรุณาเลือก "ลงวันที่" จากปฏิทิน', 'err'); return; }
+    const body = { book_no: bookNo(), book_date: bd.get(), from_org: getChoice('from_org'), to_org: getChoice('to_org'), subject: g('subject'), action: g('action'), remark: g('remark'), receiver_name: g('receiver_name') };
     for (const who of ['receiver']) {
       const d_ = dt[who].get(); const t = getT(who);
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
@@ -261,7 +281,7 @@ async function viewReports(params) {
   m.innerHTML = header('รายงานและส่งออก') + fontWarning() + `<div class="card"><form id="rf">
     <div class="grid g2"><div><label class="f">ประเภททะเบียน</label><div class="seg" id="kindseg"><label><input type="radio" name="kind" value="in">ทะเบียนหนังสือรับ</label><label><input type="radio" name="kind" value="out">ทะเบียนหนังสือส่ง</label></div></div>
       <div><label class="f">การแบ่งหน้า</label><div class="seg"><label><input type="radio" name="pageBy" value="continuous" checked>ต่อเนื่อง (ประหยัดกระดาษ)</label><label><input type="radio" name="pageBy" value="day">หน้าละวัน</label></div></div>
-      <div><label class="f">สี</label><div class="seg"><label><input type="radio" name="color" value="1" checked>พิมพ์สี (ข้อมูลสีน้ำเงินหมึกปากกา)</label><label><input type="radio" name="color" value="0">ขาวดำ</label></div></div></div>
+      <div><label class="f">สี</label><div class="seg"><label><input type="radio" name="color" value="0" checked>ขาวดำ (ตัวอักษรสีดำ)</label><label><input type="radio" name="color" value="1">สี (ข้อมูลสีน้ำเงินหมึกปากกา)</label></div></div></div>
     <div class="field" style="margin-top:12px"><label class="f">ขอบเขตรายการ</label><div class="seg" id="scopeseg">
       <label><input type="radio" name="scope" value="month">รายการประจำเดือน</label><label><input type="radio" name="scope" value="year">รายการประจำปี</label><label><input type="radio" name="scope" value="all">ทั้งหมด</label>
       <label><input type="radio" name="scope" value="range">กำหนดช่วงวันที่เอง</label><label><input type="radio" name="scope" value="selected">เฉพาะรายการที่เลือก${P.ids ? ' (' + P.ids.split(',').length + ')' : ''}</label></div></div>
@@ -328,8 +348,12 @@ async function viewSettings() {
     <div class="field"><label class="f">หัวข้อหน้าแรก</label><input type="text" id="duty_title" value="${esc(s.duty_title)}"></div>
     <div class="field"><label class="f">หน่วยที่ประจำ</label><input type="text" id="duty_unit" value="${esc(s.duty_unit)}"></div></div>
     <div class="field"><label class="f">รายชื่อผู้เข้าเวร <small>(หนึ่งคนต่อหนึ่งบรรทัด)</small></label><textarea id="duty_officers" style="min-height:110px">${esc(officers().join('\n'))}</textarea></div></div>
+  <div class="card"><h2>ตัวนำหน้า "ที่" (เลขที่หนังสือ)</h2>
+    <div class="field"><label class="f">รายการตัวนำหน้า <small>(หนึ่งแบบต่อหนึ่งบรรทัด · ลงท้ายด้วย / · บรรทัดแรกเป็นค่าหลัก · ตอนกรอกพิมพ์แค่เลขหลัง /)</small></label>
+      <textarea id="book_no_prefixes" style="min-height:90px">${esc(JSON.parse(s.book_no_prefixes || '[]').join('\n'))}</textarea></div>
+    <p class="muted" style="font-size:.9rem;margin:0">ตัวอย่าง: <b>นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/</b> แล้วพิมพ์ ๑๕๐๔ → ได้ "นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/๑๕๐๔"</p></div>
   <div class="card"><h2>ค่าตั้งต้นช่อง "จาก" / "ถึง"</h2><div class="grid g2">
-    <div class="field"><label class="f">จาก <small>(หนึ่งรายการต่อบรรทัด · บรรทัดแรกเป็นค่าหลัก)</small></label><textarea id="from_options" style="min-height:90px">${esc(JSON.parse(s.from_options || '[]').join('\n'))}</textarea></div>
+    <div class="field"><label class="f">จาก <small>(ตัวเลือกในช่องจาก/ถึง · หนึ่งรายการต่อบรรทัด · บรรทัดแรกเป็นค่าหลัก)</small></label><textarea id="from_options" style="min-height:90px">${esc(JSON.parse(s.from_options || '[]').join('\n'))}</textarea></div>
     <div class="field"><label class="f">ถึง <small>(หนึ่งรายการต่อบรรทัด · บรรทัดแรกเป็นค่าหลัก)</small></label><textarea id="to_options" style="min-height:90px">${esc(JSON.parse(s.to_options || '[]').join('\n'))}</textarea></div></div>
     <p class="muted" style="font-size:.9rem">ทะเบียนรับ: ใส่ "จาก" และ "ถึง" ตามลำดับ · ทะเบียนส่ง: สลับกันอัตโนมัติ (จาก = ถึงหลัก, ถึง = จากหลัก) แก้ไขเฉพาะรายการได้ตอนกรอก</p></div>
   <div class="card"><h2>ข้อมูลหน่วยงาน</h2><div class="grid g2">
@@ -364,7 +388,7 @@ async function viewSettings() {
   $('#save').onclick = async () => {
     const g = id => $('#' + id).value;
     try {
-      await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : g('year_mode'), from_options: g('from_options'), to_options: g('to_options'), reg_format: g('reg_format'), reg_pad: g('reg_pad'),
+      await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : g('year_mode'), from_options: g('from_options'), to_options: g('to_options'), book_no_prefixes: g('book_no_prefixes'), reg_format: g('reg_format'), reg_pad: g('reg_pad'),
         start_in: g('start_in'), start_out: g('start_out'), ui_font_size: g('ui_font_size'), print_font_size: g('print_font_size'), data_color: g('data_color') } });
       toast('บันทึกการตั้งค่าเรียบร้อย', 'ok'); await loadState(); viewSettings();
     } catch (e) { toast(e.message, 'err', 7000); }

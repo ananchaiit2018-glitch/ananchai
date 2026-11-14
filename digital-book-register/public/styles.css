@@ -153,3 +153,21 @@ table.t tr.cancelled td.nostrike{text-decoration:none}
 }
 @media (max-width:560px){.g4,.g3,.g2{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
 @media print{.side,#toasts,.theme-fab{display:none}.shell{display:block}body{background:#fff}}
+
+/* ฟอนต์ช่องกรอกข้อมูล: ใหญ่และหนา อ่านง่าย */
+input[type=text],input[type=number],input[type=password],input[type=search],select,textarea{font-size:1.12rem}
+input.ink,textarea.ink,select.ink{font-weight:700}
+.cal-wrap{position:relative}
+.cal-btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--input);min-height:44px;cursor:pointer;font-size:1.12rem;font-weight:700;text-align:left}
+.cal-btn:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.cal-text.muted{font-weight:400}
+.cal-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:70;width:330px;max-width:92vw;background:var(--card);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow-lg);padding:12px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:8px}
+.cal-head b{color:var(--heading);text-align:center;flex:1}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal-grid i{font-style:normal;color:var(--muted);font-size:.9rem;padding:2px 0}
+.cal-d{border:0;background:transparent;border-radius:10px;min-height:40px;cursor:pointer;color:var(--text);font-size:1.1rem}
+.cal-d:hover{background:var(--hover)}
+.cal-d.today{outline:2px solid var(--accent);outline-offset:-2px}
+.cal-d.sel{background:var(--accent);color:#fff;font-weight:700}
+.cal-foot{display:flex;justify-content:space-between;margin-top:8px}
