@@ -110,6 +110,9 @@ function build(opts) {
   let rowPitch = 0, textOff = 0;
   let tableTop = 0, pageNo = 0;
   const dateLine = opts.dateParts || { d: '', m: '', y: '' };
+  const pageBy = opts.pageBy === 'day' ? 'day' : 'continuous';
+  const pageRows = [];     // วันที่ลงทะเบียนของแถวในแต่ละหน้า (ใช้เติมบรรทัด "วันที่ เดือน พ.ศ." ท้ายสุด)
+  let slots = [];          // ตำแหน่งช่องวันที่/เดือน/พ.ศ. บนหัวกระดาษ
 
   function vlines(yTo) {   // เส้นตั้งทึบแบ่งคอลัมน์ + กรอบ
     doc.undash().lineWidth(0.9).strokeColor('#000');
@@ -125,7 +128,7 @@ function build(opts) {
   }
   function header() {
     doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    pageNo++; y = M.top; doc.fillColor('#000');
+    pageNo++; y = M.top; doc.fillColor('#000'); pageRows[pageNo - 1] = [];
     const f1 = f.bold ? 'Bold' : 'Reg';
     let tx = M.left;
     if (logo) { try { doc.image(logo, M.left, y - 2, { fit: [34, 34] }); tx += 40; } catch { /* ภาพเสียข้ามไป */ } }
@@ -137,11 +140,11 @@ function build(opts) {
     doc.font('Reg').fontSize(size);
     const seg = [['วันที่', dateLine.d, 46], ['เดือน', dateLine.m, 96], ['พ.ศ.', dateLine.y, 56]];
     const total = seg.reduce((s_, [l, , w]) => s_ + doc.widthOfString(l + ' ') + w + 6, 0);
-    let dx = M.left + tableW - total; const dy = y + 4;
+    let dx = M.left + tableW - total; const dy = y + 4; slots = [];
     for (const [l, val, w] of seg) {
       doc.fillColor('#000').text(l, dx, dy, { lineBreak: false }); dx += doc.widthOfString(l + ' ');
       doc.lineWidth(0.5).strokeColor('#000').dash(1, { space: 2 }).moveTo(dx, dy + lineH - 2).lineTo(dx + w, dy + lineH - 2).stroke().undash();
-      if (val) doc.fillColor(dataColor).text(val, dx, dy, { width: w, align: 'center', lineBreak: false });
+      slots.push({ x: dx, y: dy, w });
       dx += w + 6;
     }
     y += Math.max(doc.font(f1).fontSize(size + 5).currentLineHeight() + (org ? lineH * 0.9 : 0), lineH + 6) + 6;
@@ -177,7 +180,10 @@ function build(opts) {
     const cells = cols.map(c => wrap(doc, cellText(row, c.key), c.w - PAD * 2));
     const nLines = Math.max(...cells.map(l => l.length), 1);
     const rowH = nLines * rowPitch;
-    if (y + rowH > bottomY + 0.01) { endPage(true); header(); }
+    const lastDate = pageRows[pageNo - 1][pageRows[pageNo - 1].length - 1];
+    if (pageBy === 'day' && lastDate && lastDate !== row.reg_date) { endPage(true); header(); }   // หน้าละวัน
+    else if (y + rowH > bottomY + 0.01) { endPage(true); header(); }
+    pageRows[pageNo - 1].push(row.reg_date);
     let x = M.left;
     cols.forEach((c, i) => {
       doc.font('Reg').fontSize(size).fillColor(dataColor);
@@ -190,10 +196,19 @@ function build(opts) {
   if (!rows.length) doc.font('Reg').fontSize(size).fillColor('#000').text('ไม่มีรายการในช่วงที่เลือก', M.left, y + 6, { width: tableW, align: 'center', lineBreak: false });
   endPage(true);
 
-  // เลขหน้า
+  // เลขหน้า + วันที่ของหน้า
+  const pageDate = dates => {
+    const ds = dates.filter(Boolean).sort(); if (!ds.length) return dateLine;
+    const [fy, fm, fd] = ds[0].split('-').map(Number); const [ly, lm, ld] = ds[ds.length - 1].split('-').map(Number);
+    if (ds[0] === ds[ds.length - 1]) return { d: String(fd), m: U.MONTHS[fm - 1], y: String(fy + 543) };
+    if (fy === ly && fm === lm) return { d: `${fd}-${ld}`, m: U.MONTHS[fm - 1], y: String(fy + 543) };
+    return { d: `${fd}-${ld}`, m: `${U.MONTHS_SHORT[fm - 1]}-${U.MONTHS_SHORT[lm - 1]}`, y: String(ly + 543) };
+  };
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(i);
+    const pd = pageDate(pageRows[i] || []); doc.font('Reg').fontSize(size).fillColor(dataColor);
+    [pd.d, pd.m, pd.y].forEach((val, k) => { if (val && slots[k]) doc.text(val, slots[k].x - 4, slots[k].y, { width: slots[k].w + 8, align: 'center', lineBreak: false }); });
     doc.font('Reg').fontSize(size - 2).fillColor('#000');
     doc.text(`หน้า ${i + 1} / ${range.count}`, M.left, PAGE.h - M.bottom + 10, { width: tableW, align: 'right', lineBreak: false });
     doc.text(`พิมพ์เมื่อ ${U.thaiDateTime(U.nowLocal())}`, M.left, PAGE.h - M.bottom + 10, { width: tableW / 2, align: 'left', lineBreak: false });

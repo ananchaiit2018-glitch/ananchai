@@ -43,7 +43,7 @@ function titleOf(kind) { return kind === 'in' ? 'ทะเบียนหนั�
 async function makePdf(q) {
   const { p, kind, line, dateParts } = resolveScope(q);
   const rows = books.listForExport(p);
-  return pdf.build({ dateParts, kind, rows, settings: db.getSettings(), titleLine: line, color: q.color !== '0', withFrom: q.withFrom === '1' });
+  return pdf.build({ dateParts, kind, rows, settings: db.getSettings(), titleLine: line, color: q.color !== '0', withFrom: q.withFrom === '1', pageBy: q.pageBy === 'day' ? 'day' : 'continuous' });
 }
 
 async function makeXlsx(q) {

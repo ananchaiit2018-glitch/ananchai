@@ -254,6 +254,7 @@ async function viewReports(params) {
   const P = { kind: params.kind === 'out' ? 'out' : 'in', scope: params.scope || (params.ids ? 'selected' : 'month'), year: params.year || cur, month: params.month || mon, ids: params.ids || '' };
   m.innerHTML = header('รายงานและส่งออก') + fontWarning() + `<div class="card"><form id="rf">
     <div class="grid g2"><div><label class="f">ประเภททะเบียน</label><div class="seg" id="kindseg"><label><input type="radio" name="kind" value="in">ทะเบียนหนังสือรับ</label><label><input type="radio" name="kind" value="out">ทะเบียนหนังสือส่ง</label></div></div>
+      <div><label class="f">การแบ่งหน้า</label><div class="seg"><label><input type="radio" name="pageBy" value="continuous" checked>ต่อเนื่อง (ประหยัดกระดาษ)</label><label><input type="radio" name="pageBy" value="day">หน้าละวัน</label></div></div>
       <div><label class="f">สี</label><div class="seg"><label><input type="radio" name="color" value="1" checked>พิมพ์สี (ข้อมูลสีน้ำเงินหมึกปากกา)</label><label><input type="radio" name="color" value="0">ขาวดำ</label></div></div></div>
     <div class="field" style="margin-top:12px"><label class="f">ขอบเขตรายการ</label><div class="seg" id="scopeseg">
       <label><input type="radio" name="scope" value="month">รายการประจำเดือน</label><label><input type="radio" name="scope" value="year">รายการประจำปี</label><label><input type="radio" name="scope" value="all">ทั้งหมด</label>
@@ -275,7 +276,7 @@ async function viewReports(params) {
     const scope = val('scope');
     return qs({ kind: val('kind'), scope, year: scope === 'month' || scope === 'year' ? $('#year').value : '', month: scope === 'month' ? $('#month').value : '',
       from: scope === 'range' ? from.get() : '', to: scope === 'range' ? to.get() : '', ids: scope === 'selected' ? P.ids : '',
-      color: val('color'), cancelled: $('#cancelled').checked ? '1' : '0', withFrom: $('#withFrom').checked ? '1' : '0', ...extra });
+      color: val('color'), pageBy: val('pageBy'), cancelled: $('#cancelled').checked ? '1' : '0', withFrom: $('#withFrom').checked ? '1' : '0', ...extra });
   }
   function sync() {
     const sc = val('scope');
