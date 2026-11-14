@@ -14,24 +14,24 @@ const PAD = 3;
 // สัดส่วนคอลัมน์ตามแบบสมุดทะเบียนจริง (เรื่องกว้างสุด / ลงวันที่แคบ)
 const COLS = {
   in: [
-    { key: 'reg_label', title: 'เลขทะเบียนรับ', w: 100, align: 'center' },
-    { key: 'book_no', title: 'ที่', w: 108 },
-    { key: 'book_date', title: 'ลงวันที่', w: 85, align: 'center' },
-    { key: 'from_org', title: 'จาก', w: 108 },
-    { key: 'to_org', title: 'ถึง', w: 108 },
+    { key: 'reg_label', title: 'เลขทะเบียนรับ', w: 90, align: 'center' },
+    { key: 'book_no', title: 'ที่', w: 100 },
+    { key: 'book_date', title: 'ลงวันที่', w: 105, align: 'center' },
+    { key: 'from_org', title: 'จาก', w: 105 },
+    { key: 'to_org', title: 'ถึง', w: 105 },
     { key: 'subject', title: 'เรื่อง', w: 240 },
-    { key: 'action', title: 'การปฏิบัติ', w: 144 },
-    { key: 'remark', title: 'หมายเหตุ', w: 122 },
-  ],
-  out: [
-    { key: 'reg_label', title: 'เลขทะเบียนส่ง', w: 100, align: 'center' },
-    { key: 'book_no', title: 'ที่', w: 118 },
-    { key: 'book_date', title: 'ลงวันที่', w: 85, align: 'center' },
-    { key: 'from_org', title: 'จาก', w: 108, optional: true },
-    { key: 'to_org', title: 'ถึง', w: 130 },
-    { key: 'subject', title: 'เรื่อง', w: 262 },
     { key: 'action', title: 'การปฏิบัติ', w: 130 },
     { key: 'remark', title: 'หมายเหตุ', w: 110 },
+  ],
+  out: [
+    { key: 'reg_label', title: 'เลขทะเบียนส่ง', w: 90, align: 'center' },
+    { key: 'book_no', title: 'ที่', w: 110 },
+    { key: 'book_date', title: 'ลงวันที่', w: 105, align: 'center' },
+    { key: 'from_org', title: 'จาก', w: 105, optional: true },
+    { key: 'to_org', title: 'ถึง', w: 125 },
+    { key: 'subject', title: 'เรื่อง', w: 250 },
+    { key: 'action', title: 'การปฏิบัติ', w: 120 },
+    { key: 'remark', title: 'หมายเหตุ', w: 100 },
   ],
 };
 

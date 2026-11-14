@@ -68,4 +68,16 @@ function forPdf() {
   return { regular: fs.readFileSync(reg), bold: bold ? fs.readFileSync(bold) : null, family: status().regular.family };
 }
 
-module.exports = { fileOf, save, remove, status, forPdf };
+// ติดตั้งฟอนต์ TH SarabunIT๙ ที่แนบมากับโปรแกรม (โฟลเดอร์ fonts/) ให้อัตโนมัติ ถ้ายังไม่เคยนำเข้า
+function installBundled() {
+  const dir = path.join(cfg.ROOT, 'fonts');
+  const pairs = [['regular', 'THSarabunIT9.ttf'], ['bold', 'THSarabunIT9 Bold.ttf']];
+  for (const [kind, name] of pairs) {
+    try {
+      const f = path.join(dir, name);
+      if (!fileOf(kind) && fs.existsSync(f)) save(kind, fs.readFileSync(f));
+    } catch (e) { console.error('นำเข้าฟอนต์ที่แนบมาไม่สำเร็จ:', e.message); }
+  }
+}
+
+module.exports = { installBundled, fileOf, save, remove, status, forPdf };

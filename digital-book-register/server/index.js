@@ -195,6 +195,7 @@ function createApp() {
 
 function start() {
   db.open();
+  fonts.installBundled();
   const app = createApp();
   const auto = backup.autoIfDue(); if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`);
   const timer = setInterval(() => { try { backup.autoIfDue(); } catch (e) { console.error(e); } }, 3600 * 1000); timer.unref();
