@@ -208,7 +208,7 @@ function build(opts) {
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(i);
     const pd = pageDate(pageRows[i] || []); doc.font('Reg').fontSize(size).fillColor(dataColor);
-    [pd.d, pd.m, pd.y].forEach((val, k) => { if (val && slots[k]) doc.text(val, slots[k].x - 4, slots[k].y, { width: slots[k].w + 8, align: 'center', lineBreak: false }); });
+    if (opts.headerDate) [pd.d, pd.m, pd.y].forEach((val, k) => { if (val && slots[k]) doc.text(val, slots[k].x - 4, slots[k].y, { width: slots[k].w + 8, align: 'center', lineBreak: false }); });
     doc.font('Reg').fontSize(size - 2).fillColor('#000');
     doc.text(`หน้า ${i + 1} / ${range.count}`, M.left, PAGE.h - M.bottom + 10, { width: tableW, align: 'right', lineBreak: false });
   }

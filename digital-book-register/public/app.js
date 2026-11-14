@@ -289,6 +289,7 @@ async function viewReports(params) {
       <select id="month" style="width:160px">${MONTHS.map((n, i) => `<option value="${i + 1}">${n}</option>`).join('')}</select>
       <span id="rng" class="row"><span>ตั้งแต่</span><span id="rf_from"></span><span>ถึง</span><span id="rf_to"></span></span></div>
     <div class="row" style="margin-top:8px"><label><input type="checkbox" id="cancelled" checked> รวมรายการที่ยกเลิก (แสดงเพื่อให้เลขทะเบียนต่อเนื่อง)</label>
+      <label><input type="checkbox" id="headerDate"> เติม "วันที่ เดือน พ.ศ." ที่หัวกระดาษให้อัตโนมัติ (ค่าตั้งต้น: เว้นว่างไว้เขียนเอง)</label>
       <label id="fromLbl"><input type="checkbox" id="withFrom"> แสดงคอลัมน์ "จาก" ในทะเบียนส่ง</label></div>
     <div class="row" style="margin-top:14px"><button type="button" class="btn primary big" id="prev">👁️ ดูตัวอย่างก่อนพิมพ์</button><button type="button" class="btn big" id="print" disabled>🖨️ พิมพ์</button>
       <span class="grow"></span><button type="button" class="btn" id="dlpdf">⬇ PDF</button><button type="button" class="btn" id="dlx">⬇ Excel (.xlsx)</button><button type="button" class="btn" id="dlc">⬇ CSV</button></div></form></div>
@@ -302,7 +303,7 @@ async function viewReports(params) {
     const scope = val('scope');
     return qs({ kind: val('kind'), scope, year: scope === 'month' || scope === 'year' ? $('#year').value : '', month: scope === 'month' ? $('#month').value : '',
       from: scope === 'range' ? from.get() : '', to: scope === 'range' ? to.get() : '', ids: scope === 'selected' ? P.ids : '',
-      color: val('color'), pageBy: val('pageBy'), cancelled: $('#cancelled').checked ? '1' : '0', withFrom: $('#withFrom').checked ? '1' : '0', ...extra });
+      color: val('color'), pageBy: val('pageBy'), headerDate: $('#headerDate').checked ? '1' : '0', cancelled: $('#cancelled').checked ? '1' : '0', withFrom: $('#withFrom').checked ? '1' : '0', ...extra });
   }
   function sync() {
     const sc = val('scope');
