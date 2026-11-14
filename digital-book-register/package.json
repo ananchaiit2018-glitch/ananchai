@@ -1,0 +1,22 @@
+{
+  "name": "digital-book-register",
+  "version": "1.0.0",
+  "description": "ระบบทะเบียนหนังสือรับ-หนังสือส่งอิเล็กทรอนิกส์ (Local Web Application)",
+  "private": true,
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "demo": "node scripts/demo.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/system.test.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.18",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "multer": "^1.4.4",
+    "pdfkit": "^0.15.2"
+  }
+}
