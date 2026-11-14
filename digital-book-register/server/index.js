@@ -11,6 +11,8 @@ const exp = require('./export');
 const backup = require('./backup');
 const auth = require('./auth');
 const U = require('./util');
+const fsb = require('./fsbrowse');
+const isLocal = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 const ctx = require('./context');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 10 } });
@@ -194,9 +196,13 @@ function createApp() {
   // restore ด้วยชื่อไฟล์ ส่งแบบ JSON ได้เช่นกัน
   app.post('/api/backup/restore-local', wrap((req, res) => res.json(backup.restoreFromZip(backup.filePath(String((req.body || {}).name))))));
 
+  // เลือกโฟลเดอร์สำรอง (เรียกดูโฟลเดอร์ของเครื่องหลัก ใช้ได้เฉพาะที่เครื่องหลักเท่านั้น)
+  app.get('/api/fs/list', wrap((req, res) => { if (!isLocal(req)) throw new U.HttpError(403, 'เลือกโฟลเดอร์ได้เฉพาะที่เครื่องหลัก — กรุณาพิมพ์ตำแหน่งเอง'); res.json(fsb.listDir(req.query.path)); }));
+  app.post('/api/fs/mkdir', wrap((req, res) => { if (!isLocal(req)) throw new U.HttpError(403, 'สร้างโฟลเดอร์ได้เฉพาะที่เครื่องหลัก'); res.json(fsb.makeDir((req.body || {}).parent, (req.body || {}).name)); }));
+
   // ปิดโปรแกรมจากหน้าจอ (ทำได้เฉพาะจากเครื่องหลักเท่านั้น)
   app.post('/api/shutdown', (req, res) => {
-    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) throw new U.HttpError(403, 'ปิดโปรแกรมได้เฉพาะที่เครื่องหลักเท่านั้น');
+    if (!isLocal(req)) throw new U.HttpError(403, 'ปิดโปรแกรมได้เฉพาะที่เครื่องหลักเท่านั้น');
     res.json({ ok: true });
     setTimeout(() => { if (app.locals.shutdown) app.locals.shutdown(); }, 300);
   });

@@ -93,8 +93,6 @@ async function viewForm(kind, editId) {
   // ทะเบียนรับ: จาก=ต้นทางหลัก ถึง=หน่วยเรา / ทะเบียนส่ง: สลับกัน
   const defFrom = (isIn ? fromOpts[0] : toOpts[0]) || '', defTo = (isIn ? toOpts[0] : fromOpts[0]) || '';
   for (const f of ['from_org', 'to_org']) sug[f] = [...new Set([...fromOpts, ...toOpts, ...sug[f]])];
-  const actOpts = [...new Set(officers().map(shortName))]; const actCur = edit ? edit.action : shortName(getDuty());
-  if (actCur && !actOpts.includes(actCur)) actOpts.push(actCur);
   const orgOpts = f => [...new Set([...fromOpts, ...toOpts, ...(sug[f] || [])])].slice(0, 60);
   const prefixes = jl('book_no_prefixes');
   let preSel = '__custom', sufVal = '';
@@ -104,22 +102,21 @@ async function viewForm(kind, editId) {
   const dl = f => `<datalist id="dl-${f}">${sug[f].map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
   const v = f => esc(edit ? edit[f] : '');
   const recvOptions = [...new Set(officers().map(shortName))];
-  const recvCur = edit ? shortName(edit.receiver_name) : shortName(getDuty());
+  const recvCur = edit ? shortName(edit.receiver_name || edit.action) : shortName(getDuty());
   if (recvCur && !recvOptions.includes(recvCur)) recvOptions.push(recvCur);
-  const sigBlock = who => `<div class="sigbox"><h3>${L.receiver}</h3>
-    <div class="field"><label class="f">เลือกชื่อผู้รับหนังสือ <small>(พิมพ์เป็นยศ+ชื่อ ไม่มีนามสกุล · แก้รายชื่อได้ที่ ตั้งค่าระบบ)</small></label>
+  const sigBlock = who => `<div class="sigbox"><h3>👤 ผู้รับหนังสือ / ผู้บันทึก</h3>
+    <div class="grid g2"><div class="field"><label class="f">ชื่อ <small>(ลงช่อง "การปฏิบัติ" ในทะเบียน · ยศ+ชื่อ ไม่มีนามสกุล)</small></label>
       <select id="${who}_name" class="ink"><option value="">— เลือก —</option>${recvOptions.map(n => `<option value="${esc(n)}" ${n === recvCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
-    <div class="field"><label class="f">วันและเวลา${who === 'sender' ? 'ส่ง' : 'รับ'}</label><div class="row"><div class="grow" id="${who}_at_date"></div><span class="timesel"><select id="${who}_hh" class="ink" aria-label="ชั่วโมง"><option value="">--</option>${Array.from({ length: 24 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><b>:</b><select id="${who}_mm" class="ink" aria-label="นาที"><option value="">--</option>${Array.from({ length: 60 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><small class="muted">น.</small></span><button type="button" class="btn sm" id="${who}_now">ตอนนี้</button></div></div></div>`;
+    <div class="field"><label class="f">วันและเวลา${who === 'sender' ? 'ส่ง' : 'รับ'}</label><div class="row"><div class="grow" id="${who}_at_date"></div><span class="timesel"><select id="${who}_hh" class="ink" aria-label="ชั่วโมง"><option value="">--</option>${Array.from({ length: 24 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><b>:</b><select id="${who}_mm" class="ink" aria-label="นาที"><option value="">--</option>${Array.from({ length: 60 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><small class="muted">น.</small></span><button type="button" class="btn sm" id="${who}_now">ตอนนี้</button></div></div></div></div>`;
   m.innerHTML = header(edit ? `แก้ไข${KIND[kind]} ${esc(edit.reg_label)}` : `เพิ่ม${KIND[kind]}`) + fontWarning() + `
     <form class="card" id="f" autocomplete="off">
       <div class="regbox"><div>เลขทะเบียน${isIn ? 'รับ' : 'ส่ง'}</div><b>${edit ? esc(edit.reg_label) : esc(next.label)}</b>
         <small class="muted">${edit ? 'เลขทะเบียนแก้ไขไม่ได้' : 'ระบบออกเลขให้อัตโนมัติเมื่อกดบันทึก (เลขจริงอาจเปลี่ยนถ้ามีเครื่องอื่นบันทึกก่อน)'} · ไม่ใช่เลขที่หนังสือราชการ</small></div>
       <div class="grid g2"><div class="field"><label class="f">ที่ <small>(เลือกตัวนำหน้า แล้วพิมพ์เฉพาะเลขหลัง / )</small></label>
-          <div style="display:flex;gap:8px"><select id="book_pre" class="ink" style="flex:3 1 0;min-width:0">${prefixes.map(x => `<option value="${esc(x)}" ${x === preSel ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__custom" ${preSel === '__custom' ? 'selected' : ''}>พิมพ์เลขที่เอง (ไม่มีตัวนำหน้า)</option></select>
+          <div style="display:flex;gap:8px"><select id="book_pre" class="ink" style="flex:3 1 0;min-width:0">${prefixes.map(x => `<option value="${esc(x)}" ${x === preSel ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__custom" ${preSel === '__custom' ? 'selected' : ''}>✏️ พิมพ์เลขที่เอง (พิมพ์ทั้งหมด ไม่ใช้ตัวนำหน้า)</option></select>
             <input type="text" id="book_suf" class="ink" style="flex:1 1 0;min-width:96px" value="${esc(sufVal)}" maxlength="200"></div></div>
         <div class="field"><label class="f">ลงวันที่ <span class="muted">*</span></label><div id="book_date_w"></div></div></div>
-      <div class="grid g3"><div class="field"><label class="f">การปฏิบัติ <small>(ชื่อผู้บันทึก)</small></label><select id="action" class="ink">${actOpts.map(n => `<option value="${esc(n)}" ${n === actCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
-        <div class="field"><label class="f">จาก</label>${choiceHtml('from_org', orgOpts('from_org'), edit ? edit.from_org : defFrom, 'พิมพ์ชื่อหน่วยงานต้นทาง')}</div>
+      <div class="grid g2"><div class="field"><label class="f">จาก</label>${choiceHtml('from_org', orgOpts('from_org'), edit ? edit.from_org : defFrom, 'พิมพ์ชื่อหน่วยงานต้นทาง')}</div>
         <div class="field"><label class="f">ถึง</label>${choiceHtml('to_org', orgOpts('to_org'), edit ? edit.to_org : defTo, 'พิมพ์ชื่อหน่วยงานปลายทาง')}</div></div>
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
@@ -135,7 +132,7 @@ async function viewForm(kind, editId) {
   const bd = thaiDatePicker(edit ? edit.book_date : '');
   const prefillAt = !edit; $('#book_date_w').append(bd.el); if (!edit) bd.presetMonthYear();
   wireChoice('from_org'); wireChoice('to_org');
-  const syncPre = () => { $('#book_suf').placeholder = $('#book_pre').value === '__custom' ? 'พิมพ์เลขที่เต็ม' : 'เลขหลัง /'; }; $('#book_pre').onchange = () => { syncPre(); $('#book_suf').focus(); }; syncPre();
+  const syncPre = () => { const c = $('#book_pre').value === '__custom'; $('#book_suf').placeholder = c ? 'พิมพ์เลขที่หนังสือเต็มๆ ตามต้นฉบับ' : 'เลขหลัง /'; $('#book_pre').style.flex = c ? '1 1 0' : '3 1 0'; $('#book_suf').style.flex = c ? '3 1 0' : '1 1 0'; }; $('#book_pre').onchange = () => { syncPre(); $('#book_suf').focus(); }; syncPre();
   const bookNo = () => { const suf = $('#book_suf').value.trim(); return suf ? (($('#book_pre').value === '__custom' ? '' : $('#book_pre').value) + suf) : ''; };
   const dt = {};
   const setT = (w, v) => { const [h, mi] = (v || '').split(':'); $(`#${w}_hh`).value = h || ''; $(`#${w}_mm`).value = mi || ''; };
@@ -161,7 +158,8 @@ async function viewForm(kind, editId) {
     const g = id => $('#' + id).value.trim();
     if (!g('subject')) { toast('กรุณากรอก "เรื่อง"', 'err'); $('#subject').focus(); return; }
     if (!bd.get()) { toast('กรุณาเลือก "ลงวันที่" จากปฏิทิน', 'err'); return; }
-    const body = { book_no: bookNo(), book_date: bd.get(), from_org: getChoice('from_org'), to_org: getChoice('to_org'), subject: g('subject'), action: g('action'), remark: g('remark'), receiver_name: g('receiver_name') };
+    if (!g('receiver_name')) { toast('กรุณาเลือกชื่อผู้รับหนังสือ / ผู้บันทึก', 'err'); $('#receiver_name').focus(); return; }
+    const body = { book_no: bookNo(), book_date: bd.get(), from_org: getChoice('from_org'), to_org: getChoice('to_org'), subject: g('subject'), action: g('receiver_name'), remark: g('remark'), receiver_name: g('receiver_name') };
     for (const who of ['receiver']) {
       const d_ = dt[who].get(); const t = getT(who);
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
@@ -348,14 +346,13 @@ async function viewSettings() {
   <div class="card"><h2>ผู้เข้าเวร (หน้าแรก)</h2><div class="grid g2">
     <div class="field"><label class="f">หัวข้อหน้าแรก</label><input type="text" id="duty_title" value="${esc(s.duty_title)}"></div>
     <div class="field"><label class="f">หน่วยที่ประจำ</label><input type="text" id="duty_unit" value="${esc(s.duty_unit)}"></div></div>
-    <div class="field"><label class="f">รายชื่อผู้เข้าเวร <small>(หนึ่งคนต่อหนึ่งบรรทัด)</small></label><textarea id="duty_officers" style="min-height:110px">${esc(officers().join('\n'))}</textarea></div></div>
+    <div class="field"><label class="f">รายชื่อผู้เข้าเวร <small>(ชื่อเต็ม · ตอนพิมพ์ทะเบียนจะใช้แค่ยศ+ชื่อ)</small></label><div id="duty_officers"></div></div></div>
   <div class="card"><h2>ตัวนำหน้า "ที่" (เลขที่หนังสือ)</h2>
-    <div class="field"><label class="f">รายการตัวนำหน้า <small>(หนึ่งแบบต่อหนึ่งบรรทัด · ลงท้ายด้วย / · บรรทัดแรกเป็นค่าหลัก · ตอนกรอกพิมพ์แค่เลขหลัง /)</small></label>
-      <textarea id="book_no_prefixes" style="min-height:90px">${esc(JSON.parse(s.book_no_prefixes || '[]').join('\n'))}</textarea></div>
+    <div class="field"><label class="f">รายการตัวนำหน้า <small>(ลงท้ายด้วย / · ★ = ค่าหลัก · ตอนกรอกพิมพ์แค่เลขหลัง /)</small></label><div id="book_no_prefixes"></div></div>
     <p class="muted" style="font-size:.9rem;margin:0">ตัวอย่าง: <b>นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/</b> แล้วพิมพ์ ๑๕๐๔ → ได้ "นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/๑๕๐๔"</p></div>
   <div class="card"><h2>ค่าตั้งต้นช่อง "จาก" / "ถึง"</h2><div class="grid g2">
-    <div class="field"><label class="f">จาก <small>(ตัวเลือกในช่องจาก/ถึง · หนึ่งรายการต่อบรรทัด · บรรทัดแรกเป็นค่าหลัก)</small></label><textarea id="from_options" style="min-height:90px">${esc(JSON.parse(s.from_options || '[]').join('\n'))}</textarea></div>
-    <div class="field"><label class="f">ถึง <small>(หนึ่งรายการต่อบรรทัด · บรรทัดแรกเป็นค่าหลัก)</small></label><textarea id="to_options" style="min-height:90px">${esc(JSON.parse(s.to_options || '[]').join('\n'))}</textarea></div></div>
+    <div class="field"><label class="f">จาก <small>(★ = ค่าหลัก)</small></label><div id="from_options"></div></div>
+    <div class="field"><label class="f">ถึง <small>(★ = ค่าหลัก)</small></label><div id="to_options"></div></div></div>
     <p class="muted" style="font-size:.9rem">ทะเบียนรับ: ใส่ "จาก" และ "ถึง" ตามลำดับ · ทะเบียนส่ง: สลับกันอัตโนมัติ (จาก = ถึงหลัก, ถึง = จากหลัก) แก้ไขเฉพาะรายการได้ตอนกรอก</p></div>
   <div class="card"><h2>ข้อมูลหน่วยงาน</h2><div class="grid g2">
     <div class="field"><label class="f">ชื่อหน่วยงาน</label><input type="text" id="org_name" class="ink" value="${esc(s.org_name)}"></div>
@@ -383,11 +380,20 @@ async function viewSettings() {
     <div class="field"><label class="f">รหัสผ่านใหม่ ${S.st.has_password ? '<small>(เว้นว่างเพื่อลบรหัสผ่าน)</small>' : ''}</label><input type="password" id="pw_new" autocomplete="new-password"></div>
     <div class="field"><label class="f">&nbsp;</label><button class="btn" id="pw_save">บันทึกรหัสผ่าน</button></div></div>
     <p class="muted" style="font-size:.9rem">ข้อมูลทั้งหมดเก็บที่: <code>${esc(S.st.data_dir)}</code> (ไฟล์แนบเข้าถึงได้ผ่านโปรแกรมเท่านั้น ไม่ได้อยู่ในโฟลเดอร์สาธารณะ)</p></div>
-  <div class="row"><button class="btn primary big" id="save">💾 บันทึกการตั้งค่า</button></div>`;
+  <div class="savebar"><span class="muted" id="dirty"></span><button class="btn primary big" id="save">💾 บันทึกการตั้งค่า</button></div>`;
+  const jl = k => { try { return JSON.parse(s[k] || '[]'); } catch { return []; } };
+  const markDirty = () => { $('#dirty').textContent = '● มีการเปลี่ยนแปลงที่ยังไม่บันทึก'; };
+  const LE = {
+    duty_officers: listEditor($('#duty_officers'), officers(), { ph: 'เช่น ส.ต.ท.สมชาย ใจดี', star: false, onChange: markDirty }),
+    book_no_prefixes: listEditor($('#book_no_prefixes'), jl('book_no_prefixes'), { ph: 'เช่น นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/', onChange: markDirty }),
+    from_options: listEditor($('#from_options'), jl('from_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }),
+    to_options: listEditor($('#to_options'), jl('to_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }) };
+  $$('.card input:not(.le-new), .card select', m).forEach(i => i.addEventListener('input', markDirty));
   const ym = /^\d{4}$/.test(s.year_mode); $('#year_mode').value = ym ? 'manual' : (s.year_mode === 'auto' ? 'auto' : 'fiscal'); $('#year_val').value = ym ? s.year_mode : ''; $('#year_val').hidden = !ym;
   $('#year_mode').onchange = () => { $('#year_val').hidden = $('#year_mode').value !== 'manual'; if (!$('#year_val').hidden && !$('#year_val').value) $('#year_val').value = S.st.year; };
   $('#save').onclick = async () => {
-    const g = id => $('#' + id).value;
+    const g = id => LE[id] ? LE[id].get().join('\n') : $('#' + id).value;
+    if (!LE.duty_officers.get().length) { toast('ต้องมีผู้เข้าเวรอย่างน้อย 1 คน', 'err'); return; }
     try {
       await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : g('year_mode'), from_options: g('from_options'), to_options: g('to_options'), book_no_prefixes: g('book_no_prefixes'), reg_format: g('reg_format'), reg_pad: g('reg_pad'),
         start_in: g('start_in'), start_out: g('start_out'), ui_font_size: g('ui_font_size'), print_font_size: g('print_font_size'), data_color: g('data_color') } });
@@ -410,6 +416,77 @@ async function viewSettings() {
   };
 }
 
+/* ---------- ตัวแก้ไขรายการ (เพิ่ม/ลบ/แก้/เลื่อน/ตั้งค่าหลัก) ---------- */
+function listEditor(host, items, o = {}) {
+  let list = items.slice(); const star = o.star !== false;
+  host.className = 'le';
+  const changed = () => { render(); o.onChange && o.onChange(); };
+  function render() {
+    host.innerHTML = `<ul class="le-list">${list.map((t, i) => `<li class="le-item${star && i === 0 ? ' main' : ''}" draggable="true" data-i="${i}">
+        <span class="le-grip" title="ลากเพื่อเรียงลำดับ">⋮⋮</span>
+        ${star ? `<button type="button" class="le-star" data-star="${i}" title="${i === 0 ? 'ค่าหลัก' : 'ตั้งเป็นค่าหลัก'}">${i === 0 ? '★' : '☆'}</button>` : `<span class="le-no">${i + 1}</span>`}
+        <input type="text" class="le-text" data-ed="${i}" value="${esc(t)}" aria-label="แก้ไขรายการ">
+        ${star && i === 0 ? '<span class="le-badge">ค่าหลัก</span>' : ''}
+        <button type="button" class="le-btn" data-up="${i}" title="เลื่อนขึ้น" ${i ? '' : 'disabled'}>↑</button>
+        <button type="button" class="le-btn" data-dn="${i}" title="เลื่อนลง" ${i < list.length - 1 ? '' : 'disabled'}>↓</button>
+        <button type="button" class="le-btn del" data-del="${i}" title="ลบ">✕</button></li>`).join('') || '<li class="le-empty muted">ยังไม่มีรายการ — เพิ่มด้านล่าง</li>'}</ul>
+      <div class="le-add"><input type="text" class="le-new" placeholder="${esc(o.ph || 'พิมพ์รายการใหม่')}"><button type="button" class="btn primary sm le-addbtn">＋ เพิ่ม</button></div>`;
+    const add = () => { const inp = $('.le-new', host); const v = inp.value.trim(); if (!v) { inp.focus(); return; }
+      if (list.includes(v)) { toast('มีรายการนี้อยู่แล้ว', 'err'); return; } list.push(v); changed(); $('.le-new', host).focus(); };
+    $('.le-addbtn', host).onclick = add;
+    $('.le-new', host).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+    $$('[data-ed]', host).forEach(inp => { inp.onchange = () => { const v = inp.value.trim(), i = +inp.dataset.ed;
+      if (!v) list.splice(i, 1); else list[i] = v; list = [...new Set(list)]; changed(); };
+      inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } }; });
+    $$('[data-del]', host).forEach(b => b.onclick = () => { list.splice(+b.dataset.del, 1); changed(); });
+    $$('[data-up]', host).forEach(b => b.onclick = () => { const i = +b.dataset.up; [list[i - 1], list[i]] = [list[i], list[i - 1]]; changed(); });
+    $$('[data-dn]', host).forEach(b => b.onclick = () => { const i = +b.dataset.dn; [list[i + 1], list[i]] = [list[i], list[i + 1]]; changed(); });
+    $$('[data-star]', host).forEach(b => b.onclick = () => { const i = +b.dataset.star; list.unshift(...list.splice(i, 1)); changed(); });
+    let from = null;
+    $$('.le-item', host).forEach(li => {
+      li.ondragstart = e => { if (e.target.closest && e.target.closest('input')) { e.preventDefault(); return; } from = +li.dataset.i; li.classList.add('drag'); };
+      li.ondragend = () => li.classList.remove('drag');
+      li.ondragover = e => { e.preventDefault(); li.classList.add('over'); };
+      li.ondragleave = () => li.classList.remove('over');
+      li.ondrop = e => { e.preventDefault(); const to = +li.dataset.i; if (from === null || from === to) return; list.splice(to, 0, ...list.splice(from, 1)); from = null; changed(); };
+    });
+  }
+  render();
+  return { get: () => list.slice() };
+}
+
+/* ---------- หน้าต่างเลือกโฟลเดอร์ (เครื่องหลัก) ---------- */
+function pickFolder(start) {
+  return new Promise(resolve => {
+    const m = modal(`<h2>เลือกโฟลเดอร์</h2>
+      <div class="row"><button class="btn sm" id="fp_up">⬆ ขึ้นไป</button><code id="fp_path" style="flex:1 1 200px;word-break:break-all"></code></div>
+      <div id="fp_list" class="tw" style="max-height:46vh;margin:10px 0"></div>
+      <div class="notice warn" id="fp_warn" hidden>โฟลเดอร์นี้เขียนไฟล์ไม่ได้ กรุณาเลือกที่อื่น หรือสร้างโฟลเดอร์ใหม่ที่ตำแหน่งที่เขียนได้</div>
+      <div class="row" style="justify-content:space-between"><button class="btn" id="fp_new">📁＋ สร้างโฟลเดอร์ใหม่</button>
+        <span class="row"><button class="btn" id="fp_cancel">ยกเลิก</button><button class="btn primary" id="fp_ok" disabled>เลือกโฟลเดอร์นี้</button></span></div>`, { onClose: () => resolve(null) });
+    let cur = { path: '', parent: null, dirs: [] };
+    const render = () => {
+      $('#fp_path', m.el).textContent = cur.path || 'เครื่องนี้ (เลือกไดรฟ์หรือโฟลเดอร์)';
+      $('#fp_up', m.el).disabled = cur.parent === null;
+      $('#fp_new', m.el).disabled = !cur.path || !cur.writable;
+      $('#fp_ok', m.el).disabled = !cur.path || !cur.writable;
+      $('#fp_warn', m.el).hidden = !cur.path || cur.writable;
+      $('#fp_list', m.el).innerHTML = cur.dirs.length ? cur.dirs.map((d, i) => `<div class="att" style="padding:8px 12px;cursor:pointer" data-i="${i}">📁 <span>${esc(d.name)}</span></div>`).join('') : '<div class="muted" style="padding:16px">ไม่มีโฟลเดอร์ย่อย</div>';
+      $$('#fp_list [data-i]', m.el).forEach(r => r.onclick = () => load(cur.dirs[+r.dataset.i].path));
+    };
+    const load = async p => { try { cur = await api('/api/fs/list?' + qs({ path: p })); render(); } catch (e) { toast(e.message, 'err', 7000); if (p) load(''); } };
+    $('#fp_up', m.el).onclick = () => load(cur.parent || '');
+    $('#fp_cancel', m.el).onclick = () => m.close();
+    $('#fp_ok', m.el).onclick = () => { resolve(cur.path); m.close(); };
+    $('#fp_new', m.el).onclick = async () => {
+      const name = await promptBox('สร้างโฟลเดอร์ใหม่', 'ชื่อโฟลเดอร์ (เช่น สำรองทะเบียนหนังสือ)', 'สร้างโฟลเดอร์');
+      if (!name) return;
+      try { const r = await api('/api/fs/mkdir', { json: { parent: cur.path, name } }); load(r.path); } catch (e) { toast(e.message, 'err', 7000); }
+    };
+    load(start || '');
+  });
+}
+
 /* ---------- สำรองข้อมูล ---------- */
 async function viewBackup() {
   const m = shell('backup'); const b = await api('/api/backup'); const s = S.st.settings;
@@ -424,17 +501,19 @@ async function viewBackup() {
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="xl" ${s.backup_excel === '1' ? 'checked' : ''}> สำรองเป็นไฟล์ <b>Excel (.xlsx)</b> ด้วย (ทะเบียนรับ+ส่ง ทุกรายการ) เปิดดู/แก้ไขได้โดยไม่ต้องใช้โปรแกรมนี้</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="onexit" ${s.backup_on_exit === '1' ? 'checked' : ''}> สำรองให้อัตโนมัติทุกครั้งที่กด "ปิดโปรแกรม"</label></div>
       <div class="field" style="margin-top:10px"><label class="f">สำรองซ้ำไปอีกที่ <small>(เช่น แฟลชไดรฟ์ E:\\Backup — แนะนำมาก เพราะถ้าดิสก์เสีย ไฟล์สำรองในเครื่องเดียวกันหายด้วย)</small></label>
-        <input type="text" id="bdir2" value="${esc(s.backup_dir2)}" placeholder="เว้นว่างถ้าไม่ใช้"></div>
+        <div class="row"><input type="text" id="bdir2" class="grow" value="${esc(s.backup_dir2)}" placeholder="เว้นว่างถ้าไม่ใช้"><button class="btn" id="bdir2pick">📁 เลือกโฟลเดอร์…</button></div></div>
       <button class="btn" id="autosave">บันทึกการตั้งค่าสำรองอัตโนมัติ</button>
       <p class="muted" style="margin:8px 0 0">ระบบตรวจทุก 10 นาที ขณะเปิดโปรแกรมอยู่ ${(() => { const a = b.items.find(i => i.name.startsWith('auto-')); return a ? '· สำรองอัตโนมัติล่าสุด: ' + fmtStamp(a.at) : '· ยังไม่มีการสำรองอัตโนมัติ'; })()}</p></div>
     <div class="field" style="margin-top:12px"><label class="f">โฟลเดอร์เก็บไฟล์สำรอง <small>(แนะนำให้เป็นไดรฟ์อื่น/แฟลชไดรฟ์ เช่น D:\\Backup\\Register)</small></label>
-      <div class="row"><input type="text" id="bdir" class="grow" value="${esc(s.backup_dir)}" placeholder="${esc(b.dir)}"><button class="btn" id="bdirsave">บันทึกตำแหน่ง</button></div>
+      <div class="row"><input type="text" id="bdir" class="grow" value="${esc(s.backup_dir)}" placeholder="${esc(b.dir)}"><button class="btn" id="bdirpick">📁 เลือกโฟลเดอร์…</button><button class="btn" id="bdirsave">บันทึกตำแหน่ง</button></div>
       <small class="muted">ตำแหน่งปัจจุบัน: ${esc(b.dir)}</small></div><div id="log">${logRows}</div></div>
   <div class="card"><h2>ไฟล์สำรองที่มี</h2>${b.items.length ? `<table class="t"><thead><tr><th>ชื่อไฟล์</th><th>วันเวลา</th><th>ขนาด</th><th></th></tr></thead><tbody>${b.items.map(i => `<tr><td>${esc(i.name)}</td><td>${fmtStamp(i.at)}</td><td>${fmtSize(i.size)}</td>
     <td class="right"><a class="btn sm" href="/api/backup/download/${encodeURIComponent(i.name)}">ดาวน์โหลด</a> ${i.name.endsWith('.zip') ? `<button class="btn sm danger" data-rs="${esc(i.name)}">กู้คืน</button>` : '<span class="tag in">Excel</span>'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">ยังไม่มีไฟล์สำรอง</p>'}</div>
   <div class="card"><h2>กู้คืนจากไฟล์ที่เลือก</h2><div class="notice warn">การกู้คืนจะ <b>แทนที่ข้อมูลทั้งหมดในปัจจุบัน</b> ด้วยข้อมูลในไฟล์สำรอง (ระบบจะสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติก่อนเสมอ ชื่อไฟล์ขึ้นต้น before-restore)</div>
     <div class="row"><input type="file" id="rfile" accept=".zip"><button class="btn danger" id="rbtn">กู้คืนจากไฟล์นี้</button></div></div>`;
   $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name + (r.excel ? ' + Excel' : '') + (r.warn ? ' — คำเตือน: ' + r.warn : r.copy2 ? ' (และคัดลอกไป ' + r.copy2 + ' แล้ว)' : '') : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok && !r.warn ? 'ok' : 'err', 10000); viewBackup(); };
+  $('#bdirpick').onclick = async () => { const p = await pickFolder($('#bdir').value); if (p) { $('#bdir').value = p; $('#bdirsave').click(); } };
+  $('#bdir2pick').onclick = async () => { const p = await pickFolder($('#bdir2').value); if (p) { $('#bdir2').value = p; $('#autosave').click(); } };
   $('#autosave').onclick = async () => {
     try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, backup_dir2: $('#bdir2').value } });
       toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }

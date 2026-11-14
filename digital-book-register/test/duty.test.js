@@ -38,3 +38,14 @@ test('ผู้เข้าเวร: ค่าเริ่มต้น 3 คน
   assert.equal((await jj('/api/settings', { method: 'PUT', json: { duty_unit: 'ประจำ หน่วยใหม่' } })).s, 200);
   assert.equal((await jj('/api/state')).d.settings.duty_unit, 'ประจำ หน่วยใหม่');
 });
+test('เลือกโฟลเดอร์สำรอง: เรียกดู / สร้างโฟลเดอร์ใหม่ / กันชื่อไม่ถูกต้อง', async () => {
+  fs.mkdirSync(path.join(tmp, 'sub1'));
+  const root = (await jj('/api/fs/list')).d; assert.equal(root.root, true); assert.ok(root.dirs.length > 0);
+  const l = await jj('/api/fs/list?path=' + encodeURIComponent(tmp)); assert.equal(l.s, 200);
+  assert.ok(l.d.dirs.some(d => d.name === 'sub1')); assert.equal(l.d.writable, true); assert.ok(l.d.parent);
+  assert.ok(!l.d.dirs.some(d => d.name.startsWith('.')));
+  const mk = await jj('/api/fs/mkdir', { json: { parent: tmp, name: 'สำรองทะเบียน' } }); assert.equal(mk.s, 200); assert.ok(fs.statSync(mk.d.path).isDirectory());
+  assert.equal((await jj('/api/fs/mkdir', { json: { parent: tmp, name: 'สำรองทะเบียน' } })).s, 400);   // ซ้ำ
+  for (const bad of ['..', 'a/b', 'a\\b', '', 'x:y']) assert.equal((await jj('/api/fs/mkdir', { json: { parent: tmp, name: bad } })).s, 400, bad);
+  assert.equal((await jj('/api/fs/list?path=' + encodeURIComponent(path.join(tmp, 'ไม่มีจริง')))).s, 400);
+});

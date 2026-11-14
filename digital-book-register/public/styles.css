@@ -171,3 +171,29 @@ input.ink,textarea.ink,select.ink{font-weight:700}
 .cal-d.today{outline:2px solid var(--accent);outline-offset:-2px}
 .cal-d.sel{background:var(--accent);color:#fff;font-weight:700}
 .cal-foot{display:flex;justify-content:space-between;margin-top:8px}
+
+/* ---- ตัวแก้ไขรายการในหน้าตั้งค่า ---- */
+.le-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.le-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); transition: box-shadow .15s, border-color .15s, transform .15s; }
+.le-item:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.le-item.main { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.le-item.drag { opacity: .45; }
+.le-item.over { border-style: dashed; transform: translateY(2px); }
+.le-grip { cursor: grab; color: var(--muted); user-select: none; letter-spacing: -3px; padding: 0 4px; }
+.le-no { min-width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-weight: 700; font-size: .9rem; }
+.le-star { border: 0; background: none; font-size: 1.35rem; line-height: 1; cursor: pointer; color: #f5b301; padding: 2px 4px; }
+.le-star:hover { transform: scale(1.15); }
+.le-text { flex: 1; min-width: 0; border: 1px solid transparent !important; background: transparent !important; box-shadow: none !important; padding: 6px 8px !important; }
+.le-text:hover { border-color: var(--line) !important; }
+.le-text:focus { border-color: var(--accent) !important; background: var(--input) !important; }
+.le-badge { font-size: .78rem; padding: 2px 10px; border-radius: 999px; background: var(--accent); color: #fff; white-space: nowrap; }
+.le-btn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--input); color: var(--text); cursor: pointer; font-size: 1rem; flex: none; }
+.le-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.le-btn:disabled { opacity: .3; cursor: default; }
+.le-btn.del:hover { border-color: var(--danger); color: #fff; background: var(--danger); }
+.le-empty { padding: 12px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; }
+.le-add { display: flex; gap: 8px; }
+.le-add .le-new { flex: 1; border-style: dashed; }
+.savebar { position: sticky; bottom: 12px; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 10px 14px; margin-top: 14px; border-radius: 16px; background: color-mix(in srgb, var(--card) 85%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+#dirty { color: #e37400; font-weight: 600; }
+@media (max-width: 640px) { .le-grip, .le-badge { display: none; } }
