@@ -29,12 +29,12 @@ function resolveScope(q) {
 }
 
 const HEADERS = {
-  in: ['เลขทะเบียนรับ', 'ที่', 'ลงวันที่', 'จาก', 'ถึง', 'เรื่อง', 'การปฏิบัติ', 'หมายเหตุ', 'ผู้ส่งมอบหนังสือ', 'วันเวลาส่งมอบ', 'ผู้รับหนังสือ', 'วันเวลารับ', 'สถานะ'],
-  out: ['เลขทะเบียนส่ง', 'ที่', 'ลงวันที่', 'จาก', 'ถึง', 'เรื่อง', 'การปฏิบัติ', 'หมายเหตุ', 'ผู้ส่งหนังสือ', 'วันเวลาส่ง', 'ผู้รับหนังสือ', 'วันเวลารับ', 'สถานะ'],
+  in: ['เลขทะเบียนรับ', 'ที่', 'ลงวันที่', 'จาก', 'ถึง', 'เรื่อง', 'การปฏิบัติ', 'หมายเหตุ', 'ผู้รับหนังสือ', 'วันเวลารับ', 'สถานะ'],
+  out: ['เลขทะเบียนส่ง', 'ที่', 'ลงวันที่', 'จาก', 'ถึง', 'เรื่อง', 'การปฏิบัติ', 'หมายเหตุ', 'ผู้รับหนังสือ', 'วันเวลารับ', 'สถานะ'],
 };
 function toRow(b) {
   return [b.reg_label, b.book_no, U.thaiDate(b.book_date), b.from_org, b.to_org, b.subject, b.action, b.remark,
-    b.sender_name, U.thaiDateTime(b.sender_at), b.receiver_name, U.thaiDateTime(b.receiver_at),
+    b.receiver_name, U.thaiDateTime(b.receiver_at),
     b.status === 'cancelled' ? `ยกเลิก (${b.cancel_reason})` : 'ใช้งาน'];
 }
 
@@ -56,7 +56,7 @@ async function makeXlsx(q) {
   wb.creator = s.org_name || 'Digital Book Register';
   const ws = wb.addWorksheet(titleOf(kind), { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
   const hdr = HEADERS[kind];
-  const widths = [14, 18, 14, 26, 26, 46, 18, 20, 20, 18, 20, 18, 16];
+  const widths = [14, 18, 14, 26, 26, 46, 18, 20, 20, 18, 16];
   ws.columns = widths.map(w => ({ width: w }));
   const base = f => ({ ...(fam ? { name: fam } : {}), ...f });
   ws.mergeCells(1, 1, 1, hdr.length); ws.getCell('A1').value = titleOf(kind);

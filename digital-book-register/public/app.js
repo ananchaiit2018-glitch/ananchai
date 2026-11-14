@@ -66,7 +66,7 @@ async function viewForm(kind, editId) {
   if (edit && edit.status === 'cancelled') { m.innerHTML = header('แก้ไขไม่ได้') + '<div class="notice err">รายการที่ยกเลิกแล้วไม่สามารถแก้ไขได้</div>'; return; }
   const next = edit ? null : await api('/api/next/' + kind);
   const sug = {};
-  await Promise.all(['from_org', 'to_org', 'action', 'sender_name', 'receiver_name'].map(async f => { sug[f] = await api('/api/suggest?field=' + f).catch(() => []); }));
+  await Promise.all(['from_org', 'to_org', 'action', 'receiver_name'].map(async f => { sug[f] = await api('/api/suggest?field=' + f).catch(() => []); }));
   const isIn = kind === 'in';
   const L = { sender: isIn ? 'ผู้ส่งมอบหนังสือ' : 'ผู้ส่งหนังสือ', receiver: 'ผู้รับหนังสือ' };
   const dl = f => `<datalist id="dl-${f}">${sug[f].map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
@@ -90,19 +90,19 @@ async function viewForm(kind, editId) {
         <div class="field"><label class="f">ถึง</label><input type="text" id="to_org" class="ink" list="dl-to_org" value="${v('to_org')}"></div></div>
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
-      <div class="grid g2">${sigBlock('sender')}${sigBlock('receiver')}</div>
+      <div class="grid">${sigBlock('receiver')}</div>
       <p class="muted" style="font-size:.9rem">ลายเซ็นที่บันทึกเป็นภาพ ใช้เป็นหลักฐานประกอบการรับ–ส่งภายในระบบเท่านั้น ไม่ถือเป็นลายมือชื่ออิเล็กทรอนิกส์ที่ผ่านการรับรองตามกฎหมายโดยอัตโนมัติ</p>
       <div class="field"><label class="f">แนบไฟล์ <small>(PDF, JPG, PNG — ไม่เกิน 20 MB ต่อไฟล์)</small></label>
         <input type="file" id="files" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
         <div id="existing_att">${edit ? edit.attachments.map(a => `<div class="att" data-aid="${a.id}"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small><button type="button" class="btn sm danger" data-rm="${a.id}">ลบ</button></div>`).join('') : ''}</div></div>
-      ${dl('from_org')}${dl('to_org')}${dl('action')}${dl('sender_name')}${dl('receiver_name')}
+      ${dl('from_org')}${dl('to_org')}${dl('action')}${dl('receiver_name')}
       <div class="row" style="margin-top:14px"><button class="btn primary big" id="save" type="submit">💾 บันทึก${edit ? 'การแก้ไข' : ''}</button>
         <a class="btn big" href="#/${edit ? 'list/' + kind : 'dashboard'}">ยกเลิก</a><span class="muted" id="msg"></span></div>
     </form>`;
 
   const bd = thaiDatePicker(edit ? edit.book_date : ''); $('#book_date_w').append(bd.el);
   const dt = {}; const pad = {}; const sigState = { sender: edit && edit.has_sender_sig ? 'keep' : 'none', receiver: edit && edit.has_receiver_sig ? 'keep' : 'none' };
-  for (const who of ['sender', 'receiver']) {
+  for (const who of ['receiver']) {
     const at = edit ? edit[who + '_at'] : '';
     dt[who] = thaiDatePicker(at ? at.slice(0, 10) : ''); $(`#${who}_at_date`).append(dt[who].el);
     $(`#${who}_at_time`).value = at ? at.slice(11, 16) : '';
@@ -127,8 +127,8 @@ async function viewForm(kind, editId) {
     const g = id => $('#' + id).value.trim();
     if (!g('subject')) { toast('กรุณากรอก "เรื่อง"', 'err'); $('#subject').focus(); return; }
     if (!bd.get()) { toast('กรุณาระบุ "ลงวันที่" ให้ครบและถูกต้อง (วัน เดือน ปี พ.ศ.)', 'err'); return; }
-    const body = { book_no: g('book_no'), book_date: bd.get(), from_org: g('from_org'), to_org: g('to_org'), subject: g('subject'), action: g('action'), remark: g('remark'), sender_name: g('sender_name'), receiver_name: g('receiver_name') };
-    for (const who of ['sender', 'receiver']) {
+    const body = { book_no: g('book_no'), book_date: bd.get(), from_org: g('from_org'), to_org: g('to_org'), subject: g('subject'), action: g('action'), remark: g('remark'), receiver_name: g('receiver_name') };
+    for (const who of ['receiver']) {
       const d_ = dt[who].get(); const t = $(`#${who}_at_time`).value;
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
       if (sigState[who] === 'new' && !pad[who].isEmpty()) body[who + '_sig_data'] = pad[who].toDataURL();
@@ -226,7 +226,7 @@ async function openDetail(id) {
     ${cancelled ? `<div class="notice err">ยกเลิกเมื่อ ${fmtStamp(b.cancelled_at)} — เหตุผล: ${esc(b.cancel_reason)} (เลขทะเบียนนี้ถูกเก็บไว้ ไม่นำกลับมาใช้ใหม่)</div>` : ''}
     <dl class="kv ink"><dt>ที่</dt><dd>${esc(b.book_no) || '-'}</dd><dt>ลงวันที่</dt><dd>${fmtDate(b.book_date)}</dd><dt>วันที่ลงทะเบียน</dt><dd>${fmtDate(b.reg_date)}</dd>
       <dt>จาก</dt><dd>${esc(b.from_org) || '-'}</dd><dt>ถึง</dt><dd>${esc(b.to_org) || '-'}</dd><dt>เรื่อง</dt><dd>${esc(b.subject)}</dd><dt>การปฏิบัติ</dt><dd>${esc(b.action) || '-'}</dd><dt>หมายเหตุ</dt><dd>${esc(b.remark) || '-'}</dd></dl>
-    <div class="grid g2" style="margin:12px 0">${sig('sender', b.sender_name, b.sender_at)}${sig('receiver', b.receiver_name, b.receiver_at)}</div>
+    <div style="margin:12px 0">${sig('receiver', b.receiver_name, b.receiver_at)}</div>
     <h2>ไฟล์แนบ</h2>${b.attachments.length ? b.attachments.map(a => `<div class="att"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small></div>`).join('') : '<p class="muted">ไม่มี</p>'}
     <h2 style="margin-top:12px">ประวัติการแก้ไข</h2><ul class="hist">${b.history.map(h => `<li><b>${ACT[h.action] || h.action}</b> <small class="muted">${fmtStamp(h.at)}</small><div>${histText(h)}</div></li>`).join('')}</ul>
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-close>ปิด</button><a class="btn" data-print href="#/reports?${qs({ kind: b.kind, scope: 'selected', ids: b.id })}">🖨️ พิมพ์รายการนี้</a>
