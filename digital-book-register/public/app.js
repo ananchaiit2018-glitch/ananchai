@@ -56,7 +56,7 @@ async function viewDashboard() {
     </div>
     <div class="card"><div class="quick">
       <a class="btn primary big" href="#/new/in">📥 เพิ่มหนังสือรับ</a><a class="btn primary big" href="#/new/out">📤 เพิ่มหนังสือส่ง</a>
-      <a class="btn big" href="#/search">🔍 ค้นหาหนังสือ</a><a class="btn big" href="#/reports">🖨️ พิมพ์ทะเบียน</a><a class="btn big" href="#/reports?export=1">📊 ส่งออกข้อมูล</a></div></div>
+      <a class="btn big" href="#/search">🔍 ค้นหาหนังสือ</a><a class="btn big" href="#/reports?kind=in&scope=all&auto=1">🖨️ พิมพ์ทะเบียนรับ (ทั้งฉบับ)</a><a class="btn big" href="#/reports?kind=out&scope=all&auto=1">🖨️ พิมพ์ทะเบียนส่ง (ทั้งฉบับ)</a><a class="btn big" href="#/reports?export=1">📊 ส่งออกข้อมูล</a></div></div>
     <div class="card"><h2>รายการล่าสุด</h2>${d.recent.length ? `<div class="tw" style="max-height:none"><table class="t"><thead><tr><th></th><th>เลขทะเบียน</th><th>ที่</th><th>ลงวันที่</th><th>เรื่อง</th><th>จาก/ถึง</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">ยังไม่มีรายการ เริ่มต้นด้วยการกด "เพิ่มหนังสือรับ" หรือ "เพิ่มหนังสือส่ง"</p>'}
     ${d.cancelled ? `<p class="muted">รายการที่ยกเลิก (ยังเก็บเลขทะเบียนไว้): ${d.cancelled} รายการ</p>` : ''}</div>`;
   $$('tr.click', m).forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id));
@@ -251,7 +251,7 @@ async function viewReports(params) {
   const m = shell('reports'); const counters = await api('/api/counters');
   const years = [...new Set(counters.map(c => c.year))].sort((a, b) => b - a);
   const cur = S.st.year; const mon = new Date().getMonth() + 1;
-  const P = { kind: params.kind === 'out' ? 'out' : 'in', scope: params.scope || (params.ids ? 'selected' : 'month'), year: params.year || cur, month: params.month || mon, ids: params.ids || '' };
+  const P = { kind: params.kind === 'out' ? 'out' : 'in', scope: params.scope || (params.ids ? 'selected' : 'all'), year: params.year || cur, month: params.month || mon, ids: params.ids || '' };
   m.innerHTML = header('รายงานและส่งออก') + fontWarning() + `<div class="card"><form id="rf">
     <div class="grid g2"><div><label class="f">ประเภททะเบียน</label><div class="seg" id="kindseg"><label><input type="radio" name="kind" value="in">ทะเบียนหนังสือรับ</label><label><input type="radio" name="kind" value="out">ทะเบียนหนังสือส่ง</label></div></div>
       <div><label class="f">การแบ่งหน้า</label><div class="seg"><label><input type="radio" name="pageBy" value="continuous" checked>ต่อเนื่อง (ประหยัดกระดาษ)</label><label><input type="radio" name="pageBy" value="day">หน้าละวัน</label></div></div>
@@ -308,7 +308,7 @@ async function viewReports(params) {
     void extra;
   };
   $('#dlpdf').onclick = dl('pdf'); $('#dlx').onclick = dl('xlsx'); $('#dlc').onclick = dl('csv');
-  if (params.ids) preview();
+  if (params.ids || params.auto) preview();   // เปิดจากปุ่มลัด: แสดงตัวอย่างทันที
 }
 
 /* ---------- ตั้งค่า ---------- */
