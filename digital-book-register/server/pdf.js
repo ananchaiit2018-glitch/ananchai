@@ -106,6 +106,8 @@ function build(opts) {
   let y = 0;
 
   const bottomY = PAGE.h - M.bottom;
+  const ROWS_PER_PAGE = 20;   // ตามแบบสมุดทะเบียนจริง: 1 บรรทัดประ = 1 แถว ความสูงสม่ำเสมอ
+  let rowPitch = 0, textOff = 0;
   let tableTop = 0, pageNo = 0;
   const dateLine = opts.dateParts || { d: '', m: '', y: '' };
 
@@ -157,25 +159,29 @@ function build(opts) {
     y += hh;
     doc.lineWidth(0.9).strokeColor('#000').moveTo(M.left, tableTop).lineTo(M.left + tableW, tableTop).stroke().moveTo(M.left, y).lineTo(M.left + tableW, y).stroke();
     lineMarks.length = 0;
+    if (!rowPitch) {
+      rowPitch = (bottomY - y) / ROWS_PER_PAGE;
+      const th = Math.min(doc.font('Reg').fontSize(size).currentLineHeight(), size * 1.2);
+      textOff = Math.max(0, rowPitch - th - 1);
+    }
   }
   const lineMarks = [];
   function endPage(fillBlank) {   // เติมบรรทัดประเปล่าถึงท้ายหน้า เหมือนสมุดทะเบียน
-    if (fillBlank) while (y + rowPitch <= bottomY) { y += rowPitch; dotted(y); }
+    if (fillBlank) while (y + rowPitch <= bottomY + 0.01) { y += rowPitch; dotted(y); }
     vlines(Math.min(y, bottomY));
   }
 
-  const rowPitch = lineH + 3;
   header();
   for (const row of rows) {
     doc.font('Reg').fontSize(size);
     const cells = cols.map(c => wrap(doc, cellText(row, c.key), c.w - PAD * 2));
     const nLines = Math.max(...cells.map(l => l.length), 1);
     const rowH = nLines * rowPitch;
-    if (y + rowH > bottomY) { endPage(true); header(); }
+    if (y + rowH > bottomY + 0.01) { endPage(true); header(); }
     let x = M.left;
     cols.forEach((c, i) => {
       doc.font('Reg').fontSize(size).fillColor(dataColor);
-      cells[i].forEach((ln, j) => doc.text(ln, x + PAD, y + 1 + j * rowPitch, { width: c.w - PAD * 2, align: c.align || 'left', lineBreak: false }));
+      cells[i].forEach((ln, j) => doc.text(ln, x + PAD, y + textOff + j * rowPitch, { width: c.w - PAD * 2, align: c.align || 'left', lineBreak: false }));
       x += c.w;
     });
     for (let k = 1; k <= nLines; k++) dotted(y + k * rowPitch);
