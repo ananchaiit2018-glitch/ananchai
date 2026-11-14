@@ -112,3 +112,19 @@ function signaturePad(canvas, color = '#174EA6') {
     onDraw(fn) { onDraw = fn; }, fit,
   };
 }
+
+/* ---------- ธีมสว่าง/มืด (ค่าตั้งต้นตามระบบของเครื่อง จำค่าที่ผู้ใช้เลือกไว้) ---------- */
+const Theme = {
+  saved() { try { return localStorage.getItem('theme'); } catch { return null; } },
+  isDark() { const t = Theme.saved(); return t ? t === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); },
+  apply() { document.documentElement.dataset.theme = Theme.isDark() ? 'dark' : 'light'; },
+  toggle() { try { localStorage.setItem('theme', Theme.isDark() ? 'light' : 'dark'); } catch { /* ไม่มี storage */ } Theme.apply(); },
+  label() { return Theme.isDark() ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด'; },
+};
+Theme.apply();
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!Theme.saved()) Theme.apply(); });
+function themeButton(cls = 'btn sm theme-fab') {
+  const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = Theme.label();
+  b.onclick = () => { Theme.toggle(); b.textContent = Theme.label(); };
+  b.dataset.themeBtn = '1'; return b;
+}

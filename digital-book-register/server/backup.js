@@ -16,6 +16,8 @@ function backupDir() {
   return path.resolve(s.backup_dir ? s.backup_dir : cfg.DIRS.backups);
 }
 
+function backupDir2() { const s = db.getSettings(); return s.backup_dir2 ? path.resolve(s.backup_dir2) : ''; }
+
 function addDirTo(zip, dir, prefix) {
   if (!fs.existsSync(dir)) return;
   for (const n of fs.readdirSync(dir)) {
@@ -51,8 +53,14 @@ function run(prefix = 'backup') {
     if (!back.getEntry('register.db') || back.getEntry('register.db').header.size !== fs.statSync(tmpDb).size) throw new Error('ตรวจสอบไฟล์สำรองหลังเขียนไม่ผ่าน');
     fs.renameSync(part, final);
     const res = { ok: true, name, dir, size: fs.statSync(final).size, at: new Date().toISOString() };
+    // คัดลอกซ้ำไปโฟลเดอร์ที่สอง (ถ้ากำหนดไว้) ล้มเหลวไม่ทำให้การสำรองหลักล้มเหลว แต่แจ้งเตือน
+    const d2 = backupDir2();
+    if (d2) {
+      try { fs.mkdirSync(d2, { recursive: true }); fs.copyFileSync(final, path.join(d2, name + '.tmp')); fs.renameSync(path.join(d2, name + '.tmp'), path.join(d2, name)); res.copy2 = d2; }
+      catch (e) { res.warn = `สำรองที่โฟลเดอร์หลักสำเร็จ แต่คัดลอกไปที่ ${d2} ไม่สำเร็จ (${e.code || e.message}) ตรวจสอบว่าแฟลชไดรฟ์/ไดรฟ์ปลายทางเสียบอยู่`; }
+    }
     log.unshift(res); log.length = Math.min(log.length, 20);
-    if (prefix === 'auto') prune('auto-', 30);
+    if (prefix === 'auto' || prefix === 'exit') { const keep = prefix === 'exit' ? 10 : Math.max(3, parseInt(db.getSettings().backup_keep, 10) || 30); for (const dd of [dir, d2]) if (dd) prune(dd, prefix + '-', keep); }
     return res;
   } catch (e) {
     const res = { ok: false, error: e.message, at: new Date().toISOString() };
@@ -61,13 +69,14 @@ function run(prefix = 'backup') {
   } finally { fs.rmSync(tmpDb, { force: true }); }
 }
 
-function prune(prefix, keep) {
-  const items = list().filter(b => b.name.startsWith(prefix));
-  for (const b of items.slice(keep)) fs.rmSync(path.join(backupDir(), b.name), { force: true });
+function prune(dir, prefix, keep) {
+  try {
+    const items = list(dir).filter(b => b.name.startsWith(prefix));
+    for (const b of items.slice(keep)) fs.rmSync(path.join(dir, b.name), { force: true });
+  } catch { /* ไม่สำคัญ */ }
 }
 
-function list() {
-  const dir = backupDir();
+function list(dir = backupDir()) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter(n => /^[\w.-]+\.zip$/.test(n)).map(n => {
     const st = fs.statSync(path.join(dir, n));
@@ -84,8 +93,9 @@ function filePath(name) {
 function autoIfDue() {
   const s = db.getSettings();
   if (s.auto_backup !== '1') return null;
+  const hours = Math.max(1, parseInt(s.backup_every_hours, 10) || 24);
   const last = list().find(b => b.name.startsWith('auto-'));
-  if (last && Date.now() - new Date(last.at).getTime() < 23 * 3600 * 1000) return null;
+  if (last && Date.now() - new Date(last.at).getTime() < (hours * 60 - 2) * 60 * 1000) return null;
   return run('auto');
 }
 
@@ -137,4 +147,6 @@ function restoreFromZip(zipPath) {
   } finally { fs.rmSync(stage, { recursive: true, force: true }); }
 }
 
-module.exports = { run, list, filePath, autoIfDue, restoreFromZip, backupDir, log: () => log };
+function onExit() { return db.getSettings().backup_on_exit === '1' ? run('exit') : null; }
+
+module.exports = { run, list, onExit, backupDir2, filePath, autoIfDue, restoreFromZip, backupDir, log: () => log };

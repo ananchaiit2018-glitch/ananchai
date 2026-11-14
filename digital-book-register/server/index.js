@@ -83,6 +83,14 @@ function createApp() {
     num('ui_font_size', 12, 28, 'ขนาดตัวอักษรหน้าจอ'); num('print_font_size', 8, 24, 'ขนาดตัวอักษรพิมพ์');
     if (b.data_color !== undefined) { if (!/^#[0-9a-fA-F]{6}$/.test(b.data_color)) throw new U.HttpError(400, 'รหัสสีไม่ถูกต้อง เช่น #174EA6'); out.data_color = b.data_color.toUpperCase(); }
     if (b.auto_backup !== undefined) out.auto_backup = b.auto_backup ? '1' : '0';
+    if (b.backup_every_hours !== undefined) { const n = parseInt(b.backup_every_hours, 10); if (![1, 3, 6, 12, 24, 72, 168].includes(n)) throw new U.HttpError(400, 'ความถี่การสำรองไม่ถูกต้อง'); out.backup_every_hours = String(n); }
+    if (b.backup_keep !== undefined) { const n = parseInt(b.backup_keep, 10); if (!(n >= 3 && n <= 365)) throw new U.HttpError(400, 'จำนวนชุดที่เก็บต้องอยู่ระหว่าง 3-365'); out.backup_keep = String(n); }
+    if (b.backup_on_exit !== undefined) out.backup_on_exit = b.backup_on_exit ? '1' : '0';
+    if (b.backup_dir2 !== undefined) {
+      const v = String(b.backup_dir2).trim();
+      if (v) { try { fs.mkdirSync(v, { recursive: true }); fs.accessSync(v, fs.constants.W_OK); } catch { throw new U.HttpError(400, 'ไม่สามารถเขียนไฟล์ในโฟลเดอร์สำรองที่สองได้ กรุณาตรวจสอบตำแหน่ง/ว่าเสียบไดรฟ์แล้ว'); } }
+      out.backup_dir2 = v;
+    }
     if (b.backup_dir !== undefined) {
       const v = String(b.backup_dir).trim();
       if (v) { try { fs.mkdirSync(v, { recursive: true }); fs.accessSync(v, fs.constants.W_OK); } catch { throw new U.HttpError(400, 'ไม่สามารถเขียนไฟล์ในโฟลเดอร์สำรองที่ระบุได้ กรุณาตรวจสอบตำแหน่ง'); } }
@@ -172,7 +180,7 @@ function createApp() {
   }));
 
   /* --- สำรอง / กู้คืน --- */
-  app.get('/api/backup', wrap((req, res) => res.json({ dir: backup.backupDir(), items: backup.list(), log: backup.log() })));
+  app.get('/api/backup', wrap((req, res) => res.json({ dir: backup.backupDir(), dir2: backup.backupDir2(), items: backup.list(), log: backup.log() })));
   app.post('/api/backup/run', wrap((req, res) => res.json(backup.run('backup'))));
   app.get('/api/backup/download/:name', wrap((req, res) => res.download(backup.filePath(req.params.name))));
   app.post('/api/backup/restore', uploadBig.single('file'), wrap((req, res) => {
@@ -211,7 +219,7 @@ function start() {
   fonts.installBundled();
   const app = createApp();
   const auto = backup.autoIfDue(); if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`);
-  const timer = setInterval(() => { try { backup.autoIfDue(); } catch (e) { console.error(e); } }, 3600 * 1000); timer.unref();
+  const timer = setInterval(() => { try { backup.autoIfDue(); } catch (e) { console.error(e); } }, 10 * 60 * 1000); timer.unref();
   const openBrowser = () => { if (process.argv.includes('--open') && process.platform === 'win32') require('child_process').exec(`start "" "http://localhost:${cfg.PORT}"`); };
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
     openBrowser();
@@ -225,7 +233,7 @@ function start() {
     else console.error(e);
     process.exit(1);
   });
-  const stop = () => { server.close(); db.close(); process.exit(0); };
+  const stop = () => { try { backup.onExit(); } catch (e) { console.error(e); } server.close(); db.close(); process.exit(0); };
   app.locals.shutdown = stop;
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   return server;

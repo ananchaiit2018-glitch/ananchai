@@ -13,7 +13,7 @@ async function loadState() {
   S.st = await api('/api/state');
   const s = S.st.settings, f = S.st.fonts;
   document.documentElement.style.setProperty('--fs', (s.ui_font_size || 18) + 'px');
-  document.documentElement.style.setProperty('--ink', s.data_color || '#174EA6');
+  document.documentElement.style.setProperty('--ink-user', s.data_color || '#174EA6');
   let css = '';
   if (f.regular) css += `@font-face{font-family:'RegisterFont';src:url('/api/font/regular?v=${f.regular.version}');font-weight:400}`;
   if (f.bold) css += `@font-face{font-family:'RegisterFont';src:url('/api/font/bold?v=${f.bold.version}');font-weight:700}`;
@@ -25,11 +25,12 @@ function shell(active) {
   const s = S.st.settings;
   const nav = MENU.map(([r, ic, t]) => r === 'sep' ? '<div class="sep"></div>' : `<a href="#/${r}" class="${active === r ? 'on' : ''}"><span class="ic">${ic}</span>${t}</a>`).join('');
   $('#app').innerHTML = `<div class="shell"><aside class="side">
-    <div class="brand">${s.logo ? '<img src="/api/logo?' + Date.now() + '" alt="">' : ''}<div><b>${esc(s.org_name || 'ทะเบียนหนังสือ')}</b><small>รับ–ส่ง อิเล็กทรอนิกส์</small></div></div>
+    <div class="brand">${s.logo ? '<img src="/api/logo?' + Date.now() + '" alt="">' : '<div class="logo">📒</div>'}<div><b>${esc(s.org_name || 'ทะเบียนหนังสือ')}</b><small>รับ–ส่ง อิเล็กทรอนิกส์</small></div></div>
     <nav class="nav">${nav}</nav>
-    <div class="nav"><div class="sep"></div><a id="quit"><span class="ic">⏻</span>ปิดโปรแกรม</a></div>
+    <div class="nav"><div class="sep"></div><a id="theme"><span class="ic">${Theme.isDark() ? '☀️' : '🌙'}</span><span>${Theme.isDark() ? 'โหมดสว่าง' : 'โหมดมืด'}</span></a><a id="quit"><span class="ic">⏻</span>ปิดโปรแกรม</a></div>
     ${S.st.has_password ? '<div class="nav"><a id="logout"><span class="ic">🚪</span>ออกจากระบบ</a></div>' : ''}</aside>
     <main class="main" id="main"></main></div>`;
+  $('#theme').onclick = () => { Theme.toggle(); $('#theme').innerHTML = `<span class="ic">${Theme.isDark() ? '☀️' : '🌙'}</span><span>${Theme.isDark() ? 'โหมดสว่าง' : 'โหมดมืด'}</span>`; };
   $('#quit').onclick = async () => {
     if (!await confirmBox('ปิดโปรแกรม', '<p>ต้องการปิดโปรแกรมทะเบียนหนังสือหรือไม่? (ข้อมูลที่บันทึกแล้วไม่หาย)</p>', 'ปิดโปรแกรม', true)) return;
     try { await api('/api/shutdown', { method: 'POST' }); $('#app').innerHTML = '<div class="login"><div class="card" style="text-align:center"><h1 style="font-size:1.5rem">ปิดโปรแกรมเรียบร้อยแล้ว</h1><p class="muted">ปิดหน้าต่างนี้ได้เลย · เปิดใหม่โดยดับเบิลคลิกไอคอน "ทะเบียนหนังสือ" บน Desktop</p></div></div>'; } catch (e) { toast(e.message, 'err', 7000); }
@@ -387,10 +388,19 @@ async function viewSettings() {
 /* ---------- สำรองข้อมูล ---------- */
 async function viewBackup() {
   const m = shell('backup'); const b = await api('/api/backup'); const s = S.st.settings;
-  const logRows = b.log.map(l => `<div class="notice ${l.ok ? 'ok' : 'err'}">${fmtStamp(l.at)} — ${l.ok ? 'สำรองสำเร็จ: ' + esc(l.name) + ' (' + fmtSize(l.size) + ')' : 'สำรองไม่สำเร็จ: ' + esc(l.error)}</div>`).join('');
+  const logRows = b.log.map(l => `<div class="notice ${l.ok ? 'ok' : 'err'}">${fmtStamp(l.at)} — ${l.ok ? 'สำรองสำเร็จ: ' + esc(l.name) + ' (' + fmtSize(l.size) + ')' + (l.copy2 ? ' · คัดลอกไป ' + esc(l.copy2) : '') + (l.warn ? '<br><b>คำเตือน:</b> ' + esc(l.warn) : '') : 'สำรองไม่สำเร็จ: ' + esc(l.error)}</div>`).join('');
   m.innerHTML = header('สำรองและกู้คืนข้อมูล') + `
   <div class="card"><h2>สำรองข้อมูล</h2><p>ไฟล์สำรองเป็น .zip เดียว รวมฐานข้อมูล ไฟล์แนบ ลายเซ็น ฟอนต์ และโลโก้</p>
-    <div class="row"><button class="btn primary big" id="run">💾 สำรองข้อมูลตอนนี้</button><label><input type="checkbox" id="auto" ${s.auto_backup === '1' ? 'checked' : ''}> สำรองอัตโนมัติวันละครั้ง (เมื่อเปิดโปรแกรม)</label></div>
+    <div class="row"><button class="btn primary big" id="run">💾 สำรองข้อมูลตอนนี้</button></div>
+    <div class="card" style="background:var(--bg2);margin:14px 0 0;box-shadow:none"><h2>ตั้งค่าสำรองอัตโนมัติ</h2>
+      <div class="row"><label><input type="checkbox" id="auto" ${s.auto_backup === '1' ? 'checked' : ''}> เปิดสำรองอัตโนมัติ</label>
+        <span>ทุก</span><select id="every" style="width:150px">${[[1, '1 ชั่วโมง'], [3, '3 ชั่วโมง'], [6, '6 ชั่วโมง'], [12, '12 ชั่วโมง'], [24, '1 วัน'], [72, '3 วัน'], [168, '7 วัน']].map(([v, t]) => `<option value="${v}" ${String(v) === s.backup_every_hours ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <span>เก็บไว้</span><input type="number" id="keep" min="3" max="365" value="${esc(s.backup_keep)}" style="width:90px"><span>ชุดล่าสุด</span></div>
+      <div class="row" style="margin-top:8px"><label><input type="checkbox" id="onexit" ${s.backup_on_exit === '1' ? 'checked' : ''}> สำรองให้อัตโนมัติทุกครั้งที่กด "ปิดโปรแกรม"</label></div>
+      <div class="field" style="margin-top:10px"><label class="f">สำรองซ้ำไปอีกที่ <small>(เช่น แฟลชไดรฟ์ E:\\Backup — แนะนำมาก เพราะถ้าดิสก์เสีย ไฟล์สำรองในเครื่องเดียวกันหายด้วย)</small></label>
+        <input type="text" id="bdir2" value="${esc(s.backup_dir2)}" placeholder="เว้นว่างถ้าไม่ใช้"></div>
+      <button class="btn" id="autosave">บันทึกการตั้งค่าสำรองอัตโนมัติ</button>
+      <p class="muted" style="margin:8px 0 0">ระบบตรวจทุก 10 นาที ขณะเปิดโปรแกรมอยู่ ${(() => { const a = b.items.find(i => i.name.startsWith('auto-')); return a ? '· สำรองอัตโนมัติล่าสุด: ' + fmtStamp(a.at) : '· ยังไม่มีการสำรองอัตโนมัติ'; })()}</p></div>
     <div class="field" style="margin-top:12px"><label class="f">โฟลเดอร์เก็บไฟล์สำรอง <small>(แนะนำให้เป็นไดรฟ์อื่น/แฟลชไดรฟ์ เช่น D:\\Backup\\Register)</small></label>
       <div class="row"><input type="text" id="bdir" class="grow" value="${esc(s.backup_dir)}" placeholder="${esc(b.dir)}"><button class="btn" id="bdirsave">บันทึกตำแหน่ง</button></div>
       <small class="muted">ตำแหน่งปัจจุบัน: ${esc(b.dir)}</small></div><div id="log">${logRows}</div></div>
@@ -398,8 +408,11 @@ async function viewBackup() {
     <td class="right"><a class="btn sm" href="/api/backup/download/${encodeURIComponent(i.name)}">ดาวน์โหลด</a> <button class="btn sm danger" data-rs="${esc(i.name)}">กู้คืน</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">ยังไม่มีไฟล์สำรอง</p>'}</div>
   <div class="card"><h2>กู้คืนจากไฟล์ที่เลือก</h2><div class="notice warn">การกู้คืนจะ <b>แทนที่ข้อมูลทั้งหมดในปัจจุบัน</b> ด้วยข้อมูลในไฟล์สำรอง (ระบบจะสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติก่อนเสมอ ชื่อไฟล์ขึ้นต้น before-restore)</div>
     <div class="row"><input type="file" id="rfile" accept=".zip"><button class="btn danger" id="rbtn">กู้คืนจากไฟล์นี้</button></div></div>`;
-  $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok ? 'ok' : 'err', 8000); viewBackup(); };
-  $('#auto').onchange = async e => { await api('/api/settings', { method: 'PUT', json: { auto_backup: e.target.checked } }); toast('บันทึกแล้ว', 'ok'); };
+  $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name + (r.warn ? ' — คำเตือน: ' + r.warn : r.copy2 ? ' (และคัดลอกไป ' + r.copy2 + ' แล้ว)' : '') : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok && !r.warn ? 'ok' : 'err', 10000); viewBackup(); };
+  $('#autosave').onclick = async () => {
+    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_dir2: $('#bdir2').value } });
+      toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }
+  };
   $('#bdirsave').onclick = async () => { try { await api('/api/settings', { method: 'PUT', json: { backup_dir: $('#bdir').value } }); toast('บันทึกตำแหน่งสำรองข้อมูลแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };
   const doRestore = async (fn) => {
     if (!await confirmBox('ยืนยันการกู้คืนข้อมูล', '<p>ข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรอง ต้องการดำเนินการต่อหรือไม่?</p>', 'กู้คืนข้อมูล', true)) return;
@@ -413,6 +426,7 @@ async function viewBackup() {
 function viewLogin() {
   $('#app').innerHTML = `<div class="login"><div class="card"><h1 style="font-size:1.4rem">ระบบทะเบียนหนังสือรับ–ส่ง</h1><p class="muted">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
     <form id="lf"><div class="field"><input type="password" id="pw" placeholder="รหัสผ่าน" autofocus></div><button class="btn primary big" style="width:100%">เข้าสู่ระบบ</button></form></div></div>`;
+  $('#app').append(themeButton());
   $('#lf').onsubmit = async e => { e.preventDefault(); try { await api('/api/login', { json: { password: $('#pw').value } }); boot(); } catch (er) { toast(er.message, 'err'); } };
 }
 
@@ -425,6 +439,7 @@ function viewDuty() {
     <p class="muted">กรุณาเลือกชื่อผู้เข้าเวรที่กำลังบันทึกทะเบียนหนังสือ</p>
     <div style="display:grid;gap:10px;margin:14px 0">${list.map((n, i) => `<button class="btn primary big" data-i="${i}">👤 ${esc(n)}</button>`).join('') || '<div class="notice warn">ยังไม่มีรายชื่อผู้เข้าเวร</div>'}</div>
     <a href="#/settings" class="muted">⚙️ ตั้งค่ารายชื่อผู้เข้าเวร</a></div></div>`;
+  $('#app').append(themeButton());
   $$('[data-i]').forEach(b => b.onclick = () => { try { sessionStorage.setItem('duty', list[+b.dataset.i]); } catch { /* ignore */ } if (location.hash === '#/dashboard') route(); else location.hash = '#/dashboard'; });
 }
 

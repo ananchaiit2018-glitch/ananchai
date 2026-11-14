@@ -111,6 +111,10 @@ const DEFAULTS = {
   logo: '',
   backup_dir: '',
   auto_backup: '1',
+  backup_every_hours: '24',   // สำรองอัตโนมัติทุกกี่ชั่วโมง
+  backup_keep: '30',         // เก็บไฟล์สำรองอัตโนมัติล่าสุดกี่ชุด
+  backup_dir2: '',           // โฟลเดอร์สำรองที่สอง (เช่น แฟลชไดรฟ์) คัดลอกซ้ำให้อัตโนมัติ
+  backup_on_exit: '1',       // สำรองทุกครั้งที่กดปิดโปรแกรม
   password_hash: '',
 };
 function getSettings() {
