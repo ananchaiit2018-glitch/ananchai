@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const cfg = require('./config');
 const U = require('./util');
+const ctx = require('./context');
 
 const TEXT_FIELDS = ['book_no', 'from_org', 'to_org', 'subject', 'action', 'remark', 'sender_name', 'receiver_name'];
 const FIELD_LABELS = {
@@ -120,7 +121,7 @@ function saveSignature(dataUrl, bookId, who) {
 }
 
 function logHistory(d, bookId, action, changes) {
-  d.prepare('INSERT INTO history(book_id, action, changes, at) VALUES(?,?,?,?)').run(bookId, action, JSON.stringify(changes || {}), new Date().toISOString());
+  d.prepare('INSERT INTO history(book_id, action, changes, at, actor) VALUES(?,?,?,?,?)').run(bookId, action, JSON.stringify(changes || {}), new Date().toISOString(), ctx.getStore() || '');
 }
 
 /* ---------- สร้าง / แก้ไข / ยกเลิก ---------- */
@@ -216,7 +217,7 @@ function get(id) {
   const b = d.prepare('SELECT * FROM books WHERE id=?').get(id);
   if (!b) throw new U.HttpError(404, 'ไม่พบรายการ');
   b.attachments = d.prepare("SELECT id, filename, mime, size, created_at FROM attachments WHERE book_id=? AND removed_at='' ORDER BY id").all(id);
-  b.history = d.prepare('SELECT id, action, changes, at FROM history WHERE book_id=? ORDER BY id DESC').all(id).map(h => ({ ...h, changes: JSON.parse(h.changes) }));
+  b.history = d.prepare('SELECT id, action, changes, at, actor FROM history WHERE book_id=? ORDER BY id DESC').all(id).map(h => ({ ...h, changes: JSON.parse(h.changes) }));
   b.has_sender_sig = !!b.sender_sig; b.has_receiver_sig = !!b.receiver_sig;
   delete b.client_token;
   return b;

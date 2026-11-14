@@ -35,7 +35,11 @@ function shell(active) {
 function fontWarning() {
   return S.st.fonts.regular ? '' : `<div class="notice warn"><b>ยังไม่ได้นำเข้าไฟล์ฟอนต์ TH Sarabun</b> — การพิมพ์/ส่งออก PDF ต้องใช้ไฟล์ฟอนต์จริง กรุณาไปที่ <a href="#/settings">ตั้งค่าระบบ → ฟอนต์</a> แล้วนำเข้าไฟล์ THSarabunNew.ttf (และ THSarabunNew Bold.ttf)</div>`;
 }
-const header = (title, right = '') => `<div class="top"><h1>${title}</h1><div class="row"><span class="pill">ปีทะเบียน พ.ศ. ${S.st.year}</span>${right}</div></div>`;
+// ชื่อสั้น = ยศ+ชื่อ ตัดนามสกุลออก (คำแรกก่อนช่องว่าง) เช่น "ส.ต.ท.เนวิน แดงแจ้" -> "ส.ต.ท.เนวิน"
+const shortName = n => String(n || '').trim().split(/\s+/)[0];
+const getDuty = () => { try { return sessionStorage.getItem('duty') || ''; } catch { return ''; } };
+const officers = () => { try { return JSON.parse(S.st.settings.duty_officers || '[]'); } catch { return []; } };
+const header = (title, right = '') => `<div class="top"><h1>${title}</h1><div class="row"><a class="pill" href="#/duty" title="เปลี่ยนผู้เข้าเวร" style="text-decoration:none">👤 ${esc(getDuty())} ▾</a><span class="pill">ปีทะเบียน พ.ศ. ${S.st.year}</span>${right}</div></div>`;
 
 /* ---------- Dashboard ---------- */
 async function viewDashboard() {
@@ -71,14 +75,13 @@ async function viewForm(kind, editId) {
   const L = { sender: isIn ? 'ผู้ส่งมอบหนังสือ' : 'ผู้ส่งหนังสือ', receiver: 'ผู้รับหนังสือ' };
   const dl = f => `<datalist id="dl-${f}">${sug[f].map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
   const v = f => esc(edit ? edit[f] : '');
-  const sigBlock = who => `<div class="sigbox"><h3>${who === 'sender' ? L.sender : L.receiver}</h3>
-    <div class="field"><label class="f">ชื่อ-สกุล (พิมพ์)</label><input type="text" id="${who}_name" class="ink" list="dl-${who}_name" value="${v(who + '_name')}" autocomplete="off"></div>
-    <div class="field"><label class="f">วันและเวลา${who === 'sender' ? (isIn ? 'ส่งมอบ' : 'ส่ง') : 'รับ'}</label><div class="row"><div class="grow" id="${who}_at_date"></div><input type="time" id="${who}_at_time" class="ink" style="width:140px"><button type="button" class="btn sm" id="${who}_now">ตอนนี้</button></div></div>
-    <label class="f">ลายเซ็น <small>(เซ็นบนจอด้วยเมาส์/นิ้ว หรือเว้นว่างไว้เพื่อเซ็นด้วยปากกาจริงบนกระดาษที่พิมพ์)</small></label>
-    <div id="${who}_existing" ${edit && edit['has_' + who + '_sig'] ? '' : 'hidden'}><img class="sigimg" id="${who}_img" alt="ลายเซ็น" ${edit && edit['has_' + who + '_sig'] ? `src="/api/books/id/${edit.id}/signature/${who}?t=${Date.now()}"` : ''}>
-      <div class="row" style="margin-top:6px"><button type="button" class="btn sm" id="${who}_resign">เซ็นใหม่</button><button type="button" class="btn sm danger" id="${who}_del">ลบลายเซ็น</button></div></div>
-    <div id="${who}_padwrap" ${edit && edit['has_' + who + '_sig'] ? 'hidden' : ''}><canvas class="sigpad" id="${who}_pad"></canvas>
-      <div class="row" style="margin-top:6px"><button type="button" class="btn sm" id="${who}_clear">ล้างลายเซ็น</button><small class="muted" id="${who}_hint"></small></div></div></div>`;
+  const recvOptions = [...new Set(officers().map(shortName))];
+  const recvCur = edit ? shortName(edit.receiver_name) : shortName(getDuty());
+  if (recvCur && !recvOptions.includes(recvCur)) recvOptions.push(recvCur);
+  const sigBlock = who => `<div class="sigbox"><h3>${L.receiver}</h3>
+    <div class="field"><label class="f">เลือกชื่อผู้รับหนังสือ <small>(พิมพ์เป็นยศ+ชื่อ ไม่มีนามสกุล · แก้รายชื่อได้ที่ ตั้งค่าระบบ)</small></label>
+      <select id="${who}_name" class="ink"><option value="">— เลือก —</option>${recvOptions.map(n => `<option value="${esc(n)}" ${n === recvCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="field"><label class="f">วันและเวลา${who === 'sender' ? 'ส่ง' : 'รับ'}</label><div class="row"><div class="grow" id="${who}_at_date"></div><input type="time" id="${who}_at_time" class="ink" style="width:140px"><button type="button" class="btn sm" id="${who}_now">ตอนนี้</button></div></div></div>`;
   m.innerHTML = header(edit ? `แก้ไข${KIND[kind]} ${esc(edit.reg_label)}` : `เพิ่ม${KIND[kind]}`) + fontWarning() + `
     <form class="card" id="f" autocomplete="off">
       <div class="regbox"><div>เลขทะเบียน${isIn ? 'รับ' : 'ส่ง'}</div><b>${edit ? esc(edit.reg_label) : esc(next.label)}</b>
@@ -91,7 +94,6 @@ async function viewForm(kind, editId) {
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
       <div class="grid">${sigBlock('receiver')}</div>
-      <p class="muted" style="font-size:.9rem">ลายเซ็นที่บันทึกเป็นภาพ ใช้เป็นหลักฐานประกอบการรับ–ส่งภายในระบบเท่านั้น ไม่ถือเป็นลายมือชื่ออิเล็กทรอนิกส์ที่ผ่านการรับรองตามกฎหมายโดยอัตโนมัติ</p>
       <div class="field"><label class="f">แนบไฟล์ <small>(PDF, JPG, PNG — ไม่เกิน 20 MB ต่อไฟล์)</small></label>
         <input type="file" id="files" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
         <div id="existing_att">${edit ? edit.attachments.map(a => `<div class="att" data-aid="${a.id}"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small><button type="button" class="btn sm danger" data-rm="${a.id}">ลบ</button></div>`).join('') : ''}</div></div>
@@ -100,20 +102,17 @@ async function viewForm(kind, editId) {
         <a class="btn big" href="#/${edit ? 'list/' + kind : 'dashboard'}">ยกเลิก</a><span class="muted" id="msg"></span></div>
     </form>`;
 
-  const bd = thaiDatePicker(edit ? edit.book_date : ''); $('#book_date_w').append(bd.el);
-  const dt = {}; const pad = {}; const sigState = { sender: edit && edit.has_sender_sig ? 'keep' : 'none', receiver: edit && edit.has_receiver_sig ? 'keep' : 'none' };
+  const bd = thaiDatePicker(edit ? edit.book_date : '');
+  const prefillAt = !edit && getDuty(); $('#book_date_w').append(bd.el);
+  const dt = {};
   for (const who of ['receiver']) {
     const at = edit ? edit[who + '_at'] : '';
     dt[who] = thaiDatePicker(at ? at.slice(0, 10) : ''); $(`#${who}_at_date`).append(dt[who].el);
     $(`#${who}_at_time`).value = at ? at.slice(11, 16) : '';
+    if (prefillAt) { const n = nowLocal(); dt[who].set(n.slice(0, 10)); $(`#${who}_at_time`).value = n.slice(11, 16); }
     const stamp = () => { if (!dt[who].get()) { const n = nowLocal(); dt[who].set(n.slice(0, 10)); $(`#${who}_at_time`).value = n.slice(11, 16); } };
     $(`#${who}_now`).onclick = () => { const n = nowLocal(); dt[who].set(n.slice(0, 10)); $(`#${who}_at_time`).value = n.slice(11, 16); };
     $(`#${who}_name`).addEventListener('change', () => { if ($(`#${who}_name`).value.trim()) stamp(); });
-    pad[who] = signaturePad($(`#${who}_pad`), S.st.settings.data_color);
-    pad[who].onDraw(() => { stamp(); sigState[who] = 'new'; $(`#${who}_hint`).textContent = 'มีลายเซ็นแล้ว'; });
-    $(`#${who}_clear`).onclick = () => { pad[who].clear(); sigState[who] = edit && edit['has_' + who + '_sig'] && sigState[who] === 'keep' ? 'keep' : 'none'; $(`#${who}_hint`).textContent = ''; };
-    $(`#${who}_resign`).onclick = () => { $(`#${who}_existing`).hidden = true; $(`#${who}_padwrap`).hidden = false; pad[who].fit(); sigState[who] = 'none'; };
-    $(`#${who}_del`).onclick = () => { $(`#${who}_existing`).hidden = true; $(`#${who}_padwrap`).hidden = false; pad[who].fit(); sigState[who] = 'delete'; $(`#${who}_hint`).textContent = 'ลายเซ็นเดิมจะถูกลบเมื่อกดบันทึก'; };
   }
   $$('[data-rm]', m).forEach(b => b.onclick = async () => {
     if (!await confirmBox('ลบไฟล์แนบ', 'ลบไฟล์แนบนี้ออกจากรายการ? (บันทึกในประวัติการแก้ไข)', 'ลบ', true)) return;
@@ -131,8 +130,6 @@ async function viewForm(kind, editId) {
     for (const who of ['receiver']) {
       const d_ = dt[who].get(); const t = $(`#${who}_at_time`).value;
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
-      if (sigState[who] === 'new' && !pad[who].isEmpty()) body[who + '_sig_data'] = pad[who].toDataURL();
-      else if (sigState[who] === 'delete') body[who + '_sig_data'] = '';
     }
     const files = [...$('#files').files];
     saving = true; $('#save').disabled = true; $('#msg').textContent = 'กำลังบันทึก...';
@@ -220,15 +217,14 @@ function histText(h) {
 async function openDetail(id) {
   let b; try { b = await api('/api/books/id/' + id); } catch (e) { toast(e.message, 'err'); return; }
   const isIn = b.kind === 'in'; const cancelled = b.status === 'cancelled';
-  const sig = (who, name, at) => `<div class="sigbox"><h3>${who === 'sender' ? (isIn ? 'ผู้ส่งมอบ' : 'ผู้ส่ง') : 'ผู้รับ'}</h3><div class="ink">${esc(name) || '<span class="muted">-</span>'}</div>
-    <div class="muted">${at ? fmtDT(at) : ''}</div>${b['has_' + who + '_sig'] ? `<img class="sigimg" src="/api/books/id/${b.id}/signature/${who}" alt="ลายเซ็น">` : '<div class="muted" style="margin-top:6px">ไม่มีลายเซ็นภาพ (เซ็นด้วยปากกาบนกระดาษ)</div>'}</div>`;
+  const sig = (who, name, at) => `<div class="sigbox"><h3>ผู้รับหนังสือ</h3><div class="ink">${esc(shortName(name)) || '<span class="muted">-</span>'}</div><div class="muted">${at ? fmtDT(at) : ''}</div></div>`;
   const m = modal(`<div class="row"><h2 class="grow">${isIn ? 'หนังสือรับ' : 'หนังสือส่ง'} เลขทะเบียน ${esc(b.reg_label)} ${cancelled ? '<span class="tag x">ยกเลิก</span>' : ''}</h2></div>
     ${cancelled ? `<div class="notice err">ยกเลิกเมื่อ ${fmtStamp(b.cancelled_at)} — เหตุผล: ${esc(b.cancel_reason)} (เลขทะเบียนนี้ถูกเก็บไว้ ไม่นำกลับมาใช้ใหม่)</div>` : ''}
     <dl class="kv ink"><dt>ที่</dt><dd>${esc(b.book_no) || '-'}</dd><dt>ลงวันที่</dt><dd>${fmtDate(b.book_date)}</dd><dt>วันที่ลงทะเบียน</dt><dd>${fmtDate(b.reg_date)}</dd>
       <dt>จาก</dt><dd>${esc(b.from_org) || '-'}</dd><dt>ถึง</dt><dd>${esc(b.to_org) || '-'}</dd><dt>เรื่อง</dt><dd>${esc(b.subject)}</dd><dt>การปฏิบัติ</dt><dd>${esc(b.action) || '-'}</dd><dt>หมายเหตุ</dt><dd>${esc(b.remark) || '-'}</dd></dl>
     <div style="margin:12px 0">${sig('receiver', b.receiver_name, b.receiver_at)}</div>
     <h2>ไฟล์แนบ</h2>${b.attachments.length ? b.attachments.map(a => `<div class="att"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small></div>`).join('') : '<p class="muted">ไม่มี</p>'}
-    <h2 style="margin-top:12px">ประวัติการแก้ไข</h2><ul class="hist">${b.history.map(h => `<li><b>${ACT[h.action] || h.action}</b> <small class="muted">${fmtStamp(h.at)}</small><div>${histText(h)}</div></li>`).join('')}</ul>
+    <h2 style="margin-top:12px">ประวัติการแก้ไข</h2><ul class="hist">${b.history.map(h => `<li><b>${ACT[h.action] || h.action}</b> <small class="muted">${fmtStamp(h.at)}${h.actor ? ' · โดย ' + esc(h.actor) : ''}</small><div>${histText(h)}</div></li>`).join('')}</ul>
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-close>ปิด</button><a class="btn" data-print href="#/reports?${qs({ kind: b.kind, scope: 'selected', ids: b.id })}">🖨️ พิมพ์รายการนี้</a>
       ${cancelled ? '' : `<button class="btn danger" data-cancel>ยกเลิกรายการ</button><a class="btn primary" data-edit href="#/edit/${b.id}">✏️ แก้ไข</a>`}</div>`);
   $('[data-close]', m.el).onclick = m.close;
@@ -312,6 +308,10 @@ async function viewSettings() {
   const fontRow = (k, label) => `<div class="field"><label class="f">${label}</label>${f[k] ? `<div class="notice ok">ใช้ไฟล์: <b>${esc(f[k].file)}</b> — ชื่อฟอนต์จากไฟล์: <b>${esc(f[k].full || f[k].family)}</b> (${fmtSize(f[k].size)})</div>` : '<div class="notice warn">ยังไม่ได้นำเข้า</div>'}
     <div class="row"><input type="file" data-font="${k}" accept=".ttf,.otf,.woff"><button class="btn sm danger" data-fontdel="${k}" ${f[k] ? '' : 'hidden'}>ลบฟอนต์</button></div></div>`;
   m.innerHTML = header('ตั้งค่าระบบ') + fontWarning() + `
+  <div class="card"><h2>ผู้เข้าเวร (หน้าแรก)</h2><div class="grid g2">
+    <div class="field"><label class="f">หัวข้อหน้าแรก</label><input type="text" id="duty_title" value="${esc(s.duty_title)}"></div>
+    <div class="field"><label class="f">หน่วยที่ประจำ</label><input type="text" id="duty_unit" value="${esc(s.duty_unit)}"></div></div>
+    <div class="field"><label class="f">รายชื่อผู้เข้าเวร <small>(หนึ่งคนต่อหนึ่งบรรทัด)</small></label><textarea id="duty_officers" style="min-height:110px">${esc(officers().join('\n'))}</textarea></div></div>
   <div class="card"><h2>ข้อมูลหน่วยงาน</h2><div class="grid g2">
     <div class="field"><label class="f">ชื่อหน่วยงาน</label><input type="text" id="org_name" class="ink" value="${esc(s.org_name)}"></div>
     <div class="field"><label class="f">ชื่อส่วนราชการ</label><input type="text" id="dept_name" class="ink" value="${esc(s.dept_name)}"></div></div>
@@ -344,7 +344,7 @@ async function viewSettings() {
   $('#save').onclick = async () => {
     const g = id => $('#' + id).value;
     try {
-      await api('/api/settings', { method: 'PUT', json: { org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : 'auto', reg_format: g('reg_format'), reg_pad: g('reg_pad'),
+      await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : 'auto', reg_format: g('reg_format'), reg_pad: g('reg_pad'),
         start_in: g('start_in'), start_out: g('start_out'), ui_font_size: g('ui_font_size'), print_font_size: g('print_font_size'), data_color: g('data_color') } });
       toast('บันทึกการตั้งค่าเรียบร้อย', 'ok'); await loadState(); viewSettings();
     } catch (e) { toast(e.message, 'err', 7000); }
@@ -397,11 +397,25 @@ function viewLogin() {
   $('#lf').onsubmit = async e => { e.preventDefault(); try { await api('/api/login', { json: { password: $('#pw').value } }); boot(); } catch (er) { toast(er.message, 'err'); } };
 }
 
+/* ---------- หน้าแรก: เลือกผู้เข้าเวร ---------- */
+function viewDuty() {
+  const s = S.st.settings; const list = officers();
+  $('#app').innerHTML = `<div class="login" style="max-width:560px"><div class="card" style="text-align:center">
+    ${s.logo ? '<img src="/api/logo" alt="" style="height:70px;margin-bottom:6px">' : ''}
+    <h1 style="font-size:1.7rem">${esc(s.duty_title)}</h1><p style="font-size:1.2rem;margin:0 0 4px;color:var(--navy)"><b>${esc(s.duty_unit)}</b></p>
+    <p class="muted">กรุณาเลือกชื่อผู้เข้าเวรที่กำลังบันทึกทะเบียนหนังสือ</p>
+    <div style="display:grid;gap:10px;margin:14px 0">${list.map((n, i) => `<button class="btn primary big" data-i="${i}">👤 ${esc(n)}</button>`).join('') || '<div class="notice warn">ยังไม่มีรายชื่อผู้เข้าเวร</div>'}</div>
+    <a href="#/settings" class="muted">⚙️ ตั้งค่ารายชื่อผู้เข้าเวร</a></div></div>`;
+  $$('[data-i]').forEach(b => b.onclick = () => { try { sessionStorage.setItem('duty', list[+b.dataset.i]); } catch { /* ignore */ } if (location.hash === '#/dashboard') route(); else location.hash = '#/dashboard'; });
+}
+
 /* ---------- เส้นทาง ---------- */
 async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [path, query] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(query || ''));
   try {
     await loadState();
+    if (path === 'duty') return viewDuty();
+    if (path !== 'settings' && (!getDuty() || (officers().length && !officers().includes(getDuty())))) { if (location.hash !== '#/duty') location.hash = '#/duty'; return viewDuty(); }
     if (path === 'dashboard') await viewDashboard();
     else if (parts[0] === 'new') await viewForm(parts[1] === 'out' ? 'out' : 'in');
     else if (parts[0] === 'edit') await viewForm(null, +parts[1]);

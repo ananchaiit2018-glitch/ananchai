@@ -34,7 +34,7 @@ const HEADERS = {
 };
 function toRow(b) {
   return [b.reg_label, b.book_no, U.thaiDate(b.book_date), b.from_org, b.to_org, b.subject, b.action, b.remark,
-    b.receiver_name, U.thaiDateTime(b.receiver_at),
+    U.shortName(b.receiver_name), U.thaiDateTime(b.receiver_at),
     b.status === 'cancelled' ? `ยกเลิก (${b.cancel_reason})` : 'ใช้งาน'];
 }
 

@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "demo": "node scripts/demo.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/system.test.js"
+    "test": "node --disable-warning=ExperimentalWarning --test test/system.test.js test/duty.test.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.18",

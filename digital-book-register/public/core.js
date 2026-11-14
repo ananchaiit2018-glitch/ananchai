@@ -19,7 +19,8 @@ let onAuthLost = () => {};
 const setAuthLost = f => { onAuthLost = f; };
 async function api(url, opts = {}) {
   const o = { credentials: 'same-origin', ...opts };
-  if (o.json !== undefined) { o.method = o.method || 'POST'; o.headers = { 'Content-Type': 'application/json', ...(o.headers || {}) }; o.body = JSON.stringify(o.json); }
+  try { const d = sessionStorage.getItem('duty'); if (d) o.headers = { ...(o.headers || {}), 'X-Duty-Officer': encodeURIComponent(d) }; } catch { /* ไม่มี storage */ }
+  if (o.json !== undefined) { o.method = o.method || 'POST'; o.headers = { ...(o.headers || {}), 'Content-Type': 'application/json' }; o.body = JSON.stringify(o.json); }
   let r;
   try { r = await fetch(url, o); } catch { throw new Error('ติดต่อโปรแกรมไม่ได้ กรุณาตรวจสอบว่าโปรแกรมยังเปิดอยู่ (หน้าต่างสีดำต้องไม่ถูกปิด)'); }
   if (r.status === 401 && !url.startsWith('/api/login')) { onAuthLost(); throw new Error('กรุณาเข้าสู่ระบบ'); }

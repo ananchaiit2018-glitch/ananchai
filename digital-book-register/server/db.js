@@ -78,6 +78,7 @@ function open(file = cfg.DB_FILE) {
   db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 10000;');
   db.exec(SCHEMA);
+  if (!db.prepare('PRAGMA table_info(history)').all().some(c => c.name === 'actor')) db.exec("ALTER TABLE history ADD COLUMN actor TEXT NOT NULL DEFAULT ''");
   return db;
 }
 function close() { if (db) { try { db.close(); } catch { /* ignore */ } db = null; } }
@@ -92,6 +93,9 @@ function tx(fn) {
 }
 
 const DEFAULTS = {
+  duty_title: 'ผู้เข้าเวร วิทยุ',
+  duty_unit: 'ประจำ มว.ฉก.ตชด.๔๔๔๑',
+  duty_officers: JSON.stringify(['ส.ต.ท.อนันต์ชัย แก้วหัวไทร', 'ส.ต.ท.เนวิน แดงแจ้', 'ส.ต.ท.ซูไฮมีย์ บาฮา']),
   org_name: '',
   dept_name: '',
   year_mode: 'auto',       // auto = ใช้ปี พ.ศ. ตามวันที่ของเครื่อง / หรือระบุปีเอง เช่น 2569

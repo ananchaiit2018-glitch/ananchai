@@ -11,6 +11,7 @@ const exp = require('./export');
 const backup = require('./backup');
 const auth = require('./auth');
 const U = require('./util');
+const ctx = require('./context');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 10 } });
 const uploadBig = multer({ dest: path.join(cfg.DATA_DIR, '.uploads'), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
@@ -40,6 +41,10 @@ function createApp() {
   app.post('/api/logout', auth.logout);
 
   app.use('/api', auth.middleware);
+  app.use('/api', (req, res, next) => {   // ผู้เข้าเวรที่ทำรายการ
+    let a = ''; try { a = decodeURIComponent(req.headers['x-duty-officer'] || ''); } catch { /* ignore */ }
+    ctx.run(a.replace(/[\r\n]/g, ' ').slice(0, 100), next);
+  });
 
   /* --- สถานะ / ตั้งค่า --- */
   const publicSettings = () => { const s = db.getSettings(); delete s.password_hash; return s; };
@@ -51,7 +56,12 @@ function createApp() {
   app.put('/api/settings', wrap((req, res) => {
     const b = req.body || {}; const old = db.getSettings(); const out = {};
     const str = (k, max = 200) => { if (b[k] !== undefined) { const v = String(b[k]).trim(); if (v.length > max) throw new U.HttpError(400, `${k} ยาวเกินไป`); out[k] = v; } };
-    ['org_name', 'dept_name'].forEach(k => str(k));
+    ['org_name', 'dept_name'].forEach(k => str(k)); ['duty_title', 'duty_unit'].forEach(k => str(k, 100));
+    if (b.duty_officers !== undefined) {
+      const arr = (Array.isArray(b.duty_officers) ? b.duty_officers : String(b.duty_officers).split('\n')).map(x => String(x).trim()).filter(Boolean);
+      if (arr.length > 30 || arr.some(x => x.length > 100)) throw new U.HttpError(400, 'รายชื่อผู้เข้าเวรไม่ถูกต้อง (ไม่เกิน 30 คน คนละไม่เกิน 100 ตัวอักษร)');
+      out.duty_officers = JSON.stringify([...new Set(arr)]);
+    }
     if (b.year_mode !== undefined) {
       const v = String(b.year_mode).trim();
       if (v !== 'auto' && !/^(24|25|26)\d{2}$/.test(v)) throw new U.HttpError(400, 'ปี พ.ศ. ไม่ถูกต้อง (ใส่ auto หรือปี เช่น 2569)');

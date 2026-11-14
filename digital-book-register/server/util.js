@@ -34,8 +34,11 @@ function formatRegNo(no, year, fmt, padLen) {
   return String(fmt || '{no}/{year}').replace('{no}', pad(no, padLen)).replace('{year}', String(year));
 }
 
+// ชื่อสั้น = ยศ+ชื่อ ไม่มีนามสกุล
+const shortName = n => String(n || '').trim().split(/\s+/)[0];
+
 class HttpError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 
-module.exports = { MONTHS, MONTHS_SHORT, pad, todayISO, nowLocal, stamp, isISODate, isLocalDateTime, thaiDate, thaiDateTime, currentBuddhistYear, formatRegNo, HttpError };
+module.exports = { shortName, MONTHS, MONTHS_SHORT, pad, todayISO, nowLocal, stamp, isISODate, isLocalDateTime, thaiDate, thaiDateTime, currentBuddhistYear, formatRegNo, HttpError };
