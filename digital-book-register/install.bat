@@ -25,7 +25,7 @@ if errorlevel 1 ( echo [ผิดพลาด] ติดตั้งไม่ส
 
 :shortcut
 echo กำลังสร้างไอคอนบน Desktop...
-powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\ทะเบียนหนังสือ.lnk'); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Save()"
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\ทะเบียนหนังสือ.lnk'); $s.TargetPath='%~dp0start-hidden.vbs'; $s.WorkingDirectory='%~dp0'; $s.Save()"
 echo.
 echo ติดตั้งเสร็จแล้ว ดับเบิลคลิกไอคอน "ทะเบียนหนังสือ" บน Desktop เพื่อเปิดโปรแกรม
 pause

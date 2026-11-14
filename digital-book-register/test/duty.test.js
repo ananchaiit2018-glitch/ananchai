@@ -14,6 +14,9 @@ const jj = async (p, o = {}) => {
 test.before(async () => { db.open(); await new Promise(r => { server = createApp().listen(0, '127.0.0.1', r); }); base = 'http://127.0.0.1:' + server.address().port; });
 test.after(() => { server.closeAllConnections(); server.close(); db.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
+test('ปุ่มปิดโปรแกรม: ตอบ ok เมื่อเรียกจากเครื่องหลัก (ในเทสต์ไม่ปิดโปรเซสจริง)', async () => {
+  assert.equal((await jj('/api/shutdown', { method: 'POST' })).s, 200);
+});
 test('ปีงบประมาณ(ค่าตั้งต้น) และค่าตั้งต้นช่อง จาก/ถึง', async () => {
   const d = new Date(); const exp = d.getFullYear() + 543 + (d.getMonth() >= 9 ? 1 : 0);
   const st = (await jj('/api/state')).d; assert.equal(st.settings.year_mode, 'fiscal'); assert.equal(st.year, exp);

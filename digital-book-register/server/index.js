@@ -185,6 +185,13 @@ function createApp() {
   // restore ด้วยชื่อไฟล์ ส่งแบบ JSON ได้เช่นกัน
   app.post('/api/backup/restore-local', wrap((req, res) => res.json(backup.restoreFromZip(backup.filePath(String((req.body || {}).name))))));
 
+  // ปิดโปรแกรมจากหน้าจอ (ทำได้เฉพาะจากเครื่องหลักเท่านั้น)
+  app.post('/api/shutdown', (req, res) => {
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) throw new U.HttpError(403, 'ปิดโปรแกรมได้เฉพาะที่เครื่องหลักเท่านั้น');
+    res.json({ ok: true });
+    setTimeout(() => { if (app.locals.shutdown) app.locals.shutdown(); }, 300);
+  });
+
   app.use('/api', (req, res) => res.status(404).json({ error: 'ไม่พบบริการที่ร้องขอ' }));
   app.use(express.static(path.join(cfg.ROOT, 'public'), { maxAge: 0, etag: true }));
 
@@ -205,17 +212,21 @@ function start() {
   const app = createApp();
   const auto = backup.autoIfDue(); if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`);
   const timer = setInterval(() => { try { backup.autoIfDue(); } catch (e) { console.error(e); } }, 3600 * 1000); timer.unref();
+  const openBrowser = () => { if (process.argv.includes('--open') && process.platform === 'win32') require('child_process').exec(`start "" "http://localhost:${cfg.PORT}"`); };
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
+    openBrowser();
     console.log(`ระบบทะเบียนหนังสือรับ-ส่ง พร้อมใช้งานที่  http://localhost:${cfg.PORT}`);
     console.log(`ข้อมูลเก็บไว้ที่: ${cfg.DATA_DIR}`);
     if (cfg.HOST !== '127.0.0.1' && cfg.HOST !== 'localhost') console.log(`เปิดให้เครื่องอื่นในเครือข่ายเข้าถึงได้ (host=${cfg.HOST}) ควรตั้งรหัสผ่านในหน้า "ตั้งค่าระบบ"`);
   });
   server.on('error', e => {
+    if (e.code === 'EADDRINUSE') openBrowser();   // เปิดซ้ำ: โปรแกรมทำงานอยู่แล้ว แค่เปิดหน้าเว็บให้
     if (e.code === 'EADDRINUSE') console.error(`พอร์ต ${cfg.PORT} ถูกใช้งานอยู่ อาจเปิดโปรแกรมนี้ค้างไว้แล้ว หรือเปลี่ยน port ในไฟล์ config.json`);
     else console.error(e);
     process.exit(1);
   });
   const stop = () => { server.close(); db.close(); process.exit(0); };
+  app.locals.shutdown = stop;
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   return server;
 }

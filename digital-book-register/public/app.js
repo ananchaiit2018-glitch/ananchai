@@ -27,8 +27,13 @@ function shell(active) {
   $('#app').innerHTML = `<div class="shell"><aside class="side">
     <div class="brand">${s.logo ? '<img src="/api/logo?' + Date.now() + '" alt="">' : ''}<div><b>${esc(s.org_name || 'ทะเบียนหนังสือ')}</b><small>รับ–ส่ง อิเล็กทรอนิกส์</small></div></div>
     <nav class="nav">${nav}</nav>
-    ${S.st.has_password ? '<div class="nav"><div class="sep"></div><a id="logout"><span class="ic">🚪</span>ออกจากระบบ</a></div>' : ''}</aside>
+    <div class="nav"><div class="sep"></div><a id="quit"><span class="ic">⏻</span>ปิดโปรแกรม</a></div>
+    ${S.st.has_password ? '<div class="nav"><a id="logout"><span class="ic">🚪</span>ออกจากระบบ</a></div>' : ''}</aside>
     <main class="main" id="main"></main></div>`;
+  $('#quit').onclick = async () => {
+    if (!await confirmBox('ปิดโปรแกรม', '<p>ต้องการปิดโปรแกรมทะเบียนหนังสือหรือไม่? (ข้อมูลที่บันทึกแล้วไม่หาย)</p>', 'ปิดโปรแกรม', true)) return;
+    try { await api('/api/shutdown', { method: 'POST' }); $('#app').innerHTML = '<div class="login"><div class="card" style="text-align:center"><h1 style="font-size:1.5rem">ปิดโปรแกรมเรียบร้อยแล้ว</h1><p class="muted">ปิดหน้าต่างนี้ได้เลย · เปิดใหม่โดยดับเบิลคลิกไอคอน "ทะเบียนหนังสือ" บน Desktop</p></div></div>'; } catch (e) { toast(e.message, 'err', 7000); }
+  };
   const lo = $('#logout'); if (lo) lo.onclick = async () => { await api('/api/logout', { method: 'POST' }); location.reload(); };
   return $('#main');
 }
