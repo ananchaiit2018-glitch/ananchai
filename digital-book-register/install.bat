@@ -15,9 +15,15 @@ if %NV% LSS 22 (
   echo [ผิดพลาด] Node.js เวอร์ชันเก่าเกินไป ต้องเป็นเวอร์ชัน 22 ขึ้นไป
   pause & exit /b 1
 )
+if exist node_modules\express\package.json (
+  echo พบส่วนประกอบครบแล้ว ไม่ต้องใช้อินเทอร์เน็ต
+  goto shortcut
+)
 echo กำลังติดตั้งส่วนประกอบ ^(ต้องต่อเน็ตครั้งแรกครั้งเดียว^)...
 call npm install --omit=dev
 if errorlevel 1 ( echo [ผิดพลาด] ติดตั้งไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต & pause & exit /b 1 )
+
+:shortcut
 echo กำลังสร้างไอคอนบน Desktop...
 powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\ทะเบียนหนังสือ.lnk'); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Save()"
 echo.
