@@ -413,7 +413,7 @@ async function viewSettings() {
 /* ---------- สำรองข้อมูล ---------- */
 async function viewBackup() {
   const m = shell('backup'); const b = await api('/api/backup'); const s = S.st.settings;
-  const logRows = b.log.map(l => `<div class="notice ${l.ok ? 'ok' : 'err'}">${fmtStamp(l.at)} — ${l.ok ? 'สำรองสำเร็จ: ' + esc(l.name) + ' (' + fmtSize(l.size) + ')' + (l.copy2 ? ' · คัดลอกไป ' + esc(l.copy2) : '') + (l.warn ? '<br><b>คำเตือน:</b> ' + esc(l.warn) : '') : 'สำรองไม่สำเร็จ: ' + esc(l.error)}</div>`).join('');
+  const logRows = b.log.map(l => `<div class="notice ${l.ok ? 'ok' : 'err'}">${fmtStamp(l.at)} — ${l.ok ? 'สำรองสำเร็จ: ' + esc(l.name) + ' (' + fmtSize(l.size) + ')' + (l.copy2 ? ' · คัดลอกไป ' + esc(l.copy2) : '') + (l.excel ? ' · Excel: ' + esc(l.excel) : '') + (l.warn ? '<br><b>คำเตือน:</b> ' + esc(l.warn) : '') : 'สำรองไม่สำเร็จ: ' + esc(l.error)}</div>`).join('');
   m.innerHTML = header('สำรองและกู้คืนข้อมูล') + `
   <div class="card"><h2>สำรองข้อมูล</h2><p>ไฟล์สำรองเป็น .zip เดียว รวมฐานข้อมูล ไฟล์แนบ ลายเซ็น ฟอนต์ และโลโก้</p>
     <div class="row"><button class="btn primary big" id="run">💾 สำรองข้อมูลตอนนี้</button></div>
@@ -421,6 +421,7 @@ async function viewBackup() {
       <div class="row"><label><input type="checkbox" id="auto" ${s.auto_backup === '1' ? 'checked' : ''}> เปิดสำรองอัตโนมัติ</label>
         <span>ทุก</span><select id="every" style="width:150px">${[[1, '1 ชั่วโมง'], [3, '3 ชั่วโมง'], [6, '6 ชั่วโมง'], [12, '12 ชั่วโมง'], [24, '1 วัน'], [72, '3 วัน'], [168, '7 วัน']].map(([v, t]) => `<option value="${v}" ${String(v) === s.backup_every_hours ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <span>เก็บไว้</span><input type="number" id="keep" min="3" max="365" value="${esc(s.backup_keep)}" style="width:90px"><span>ชุดล่าสุด</span></div>
+      <div class="row" style="margin-top:8px"><label><input type="checkbox" id="xl" ${s.backup_excel === '1' ? 'checked' : ''}> สำรองเป็นไฟล์ <b>Excel (.xlsx)</b> ด้วย (ทะเบียนรับ+ส่ง ทุกรายการ) เปิดดู/แก้ไขได้โดยไม่ต้องใช้โปรแกรมนี้</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="onexit" ${s.backup_on_exit === '1' ? 'checked' : ''}> สำรองให้อัตโนมัติทุกครั้งที่กด "ปิดโปรแกรม"</label></div>
       <div class="field" style="margin-top:10px"><label class="f">สำรองซ้ำไปอีกที่ <small>(เช่น แฟลชไดรฟ์ E:\\Backup — แนะนำมาก เพราะถ้าดิสก์เสีย ไฟล์สำรองในเครื่องเดียวกันหายด้วย)</small></label>
         <input type="text" id="bdir2" value="${esc(s.backup_dir2)}" placeholder="เว้นว่างถ้าไม่ใช้"></div>
@@ -430,12 +431,12 @@ async function viewBackup() {
       <div class="row"><input type="text" id="bdir" class="grow" value="${esc(s.backup_dir)}" placeholder="${esc(b.dir)}"><button class="btn" id="bdirsave">บันทึกตำแหน่ง</button></div>
       <small class="muted">ตำแหน่งปัจจุบัน: ${esc(b.dir)}</small></div><div id="log">${logRows}</div></div>
   <div class="card"><h2>ไฟล์สำรองที่มี</h2>${b.items.length ? `<table class="t"><thead><tr><th>ชื่อไฟล์</th><th>วันเวลา</th><th>ขนาด</th><th></th></tr></thead><tbody>${b.items.map(i => `<tr><td>${esc(i.name)}</td><td>${fmtStamp(i.at)}</td><td>${fmtSize(i.size)}</td>
-    <td class="right"><a class="btn sm" href="/api/backup/download/${encodeURIComponent(i.name)}">ดาวน์โหลด</a> <button class="btn sm danger" data-rs="${esc(i.name)}">กู้คืน</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">ยังไม่มีไฟล์สำรอง</p>'}</div>
+    <td class="right"><a class="btn sm" href="/api/backup/download/${encodeURIComponent(i.name)}">ดาวน์โหลด</a> ${i.name.endsWith('.zip') ? `<button class="btn sm danger" data-rs="${esc(i.name)}">กู้คืน</button>` : '<span class="tag in">Excel</span>'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">ยังไม่มีไฟล์สำรอง</p>'}</div>
   <div class="card"><h2>กู้คืนจากไฟล์ที่เลือก</h2><div class="notice warn">การกู้คืนจะ <b>แทนที่ข้อมูลทั้งหมดในปัจจุบัน</b> ด้วยข้อมูลในไฟล์สำรอง (ระบบจะสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติก่อนเสมอ ชื่อไฟล์ขึ้นต้น before-restore)</div>
     <div class="row"><input type="file" id="rfile" accept=".zip"><button class="btn danger" id="rbtn">กู้คืนจากไฟล์นี้</button></div></div>`;
-  $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name + (r.warn ? ' — คำเตือน: ' + r.warn : r.copy2 ? ' (และคัดลอกไป ' + r.copy2 + ' แล้ว)' : '') : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok && !r.warn ? 'ok' : 'err', 10000); viewBackup(); };
+  $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name + (r.excel ? ' + Excel' : '') + (r.warn ? ' — คำเตือน: ' + r.warn : r.copy2 ? ' (และคัดลอกไป ' + r.copy2 + ' แล้ว)' : '') : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok && !r.warn ? 'ok' : 'err', 10000); viewBackup(); };
   $('#autosave').onclick = async () => {
-    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_dir2: $('#bdir2').value } });
+    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, backup_dir2: $('#bdir2').value } });
       toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }
   };
   $('#bdirsave').onclick = async () => { try { await api('/api/settings', { method: 'PUT', json: { backup_dir: $('#bdir').value } }); toast('บันทึกตำแหน่งสำรองข้อมูลแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };

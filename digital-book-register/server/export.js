@@ -46,14 +46,16 @@ async function makePdf(q) {
   return pdf.build({ dateParts, kind, rows, settings: db.getSettings(), titleLine: line, color: q.color === '1', withFrom: q.withFrom === '1', pageBy: q.pageBy === 'day' ? 'day' : 'continuous', headerDate: q.headerDate === '1' });
 }
 
-async function makeXlsx(q) {
-  const { p, kind, line } = resolveScope(q);
-  const rows = books.listForExport(p);
+function newBook(useColor) {
   const s = db.getSettings();
   const fam = (fonts.status().regular || {}).family || undefined;   // ใช้ชื่อฟอนต์จากไฟล์ที่นำเข้าเท่านั้น
-  const color = q.color === '1' ? 'FF' + (s.data_color || '#174EA6').slice(1).toUpperCase() : 'FF000000';
+  const color = useColor ? 'FF' + (s.data_color || '#174EA6').slice(1).toUpperCase() : 'FF000000';
   const wb = new ExcelJS.Workbook();
   wb.creator = s.org_name || 'Digital Book Register';
+  return { wb, s, fam, color };
+}
+
+function addSheet(wb, kind, rows, line, fam, color, s) {
   const ws = wb.addWorksheet(titleOf(kind), { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
   const hdr = HEADERS[kind];
   const widths = [14, 18, 14, 26, 26, 46, 18, 20, 20, 18, 16];
@@ -76,6 +78,20 @@ async function makeXlsx(q) {
   hr.eachCell(c => { c.border = border; });
   ws.views = [{ state: 'frozen', ySplit: 4 }];
   ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + Math.max(rows.length, 1), column: hdr.length } };
+}
+
+async function makeXlsx(q) {
+  const { p, kind, line } = resolveScope(q);
+  const rows = books.listForExport(p);
+  const { wb, s, fam, color } = newBook(q.color === '1');
+  addSheet(wb, kind, rows, line, fam, color, s);
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+// ไฟล์ Excel สำหรับสำรองข้อมูล: ทะเบียนรับ + ทะเบียนส่ง ทุกรายการ (รวมที่ยกเลิก) คนละแผ่นงาน
+async function makeXlsxAll() {
+  const { wb, s, fam, color } = newBook(false);
+  for (const kind of ['in', 'out']) addSheet(wb, kind, books.listForExport({ kind }), 'ทั้งหมด (ไฟล์สำรองข้อมูล)', fam, color, s);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -91,4 +107,4 @@ function makeCsv(q) {
   return Buffer.from('﻿' + lines.join('\r\n') + '\r\n', 'utf8');   // BOM ให้ Excel อ่านภาษาไทยถูกต้อง
 }
 
-module.exports = { makePdf, makeXlsx, makeCsv, titleOf, resolveScope };
+module.exports = { makePdf, makeXlsx, makeXlsxAll, makeCsv, titleOf, resolveScope };

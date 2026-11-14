@@ -19,21 +19,33 @@ test('ปลายทางที่สองใช้ไม่ได้ -> ส�
   const r = backup.run('backup'); assert.ok(r.ok); assert.ok(r.warn && /ไม่สำเร็จ/.test(r.warn));
   db.setSetting('backup_dir2', dir2);
 });
-test('ความถี่สำรองอัตโนมัติ: ยังไม่ถึงเวลาไม่สำรอง / เลยเวลาแล้วสำรอง', () => {
+test('ความถี่สำรองอัตโนมัติ: ยังไม่ถึงเวลาไม่สำรอง / เลยเวลาแล้วสำรอง', async () => {
   db.setSetting('auto_backup', '1'); db.setSetting('backup_every_hours', '6');
-  const first = backup.autoIfDue(); assert.ok(first && first.ok);
-  assert.equal(backup.autoIfDue(), null);                                   // เพิ่งสำรอง
+  const first = await backup.autoIfDue(); assert.ok(first && first.ok);
+  assert.equal(await backup.autoIfDue(), null);                             // เพิ่งสำรอง
   const f = path.join(backup.backupDir(), first.name); const old = new Date(Date.now() - 7 * 3600 * 1000); fs.utimesSync(f, old, old);
-  const again = backup.autoIfDue(); assert.ok(again && again.ok);           // เกิน 6 ชม. แล้ว
+  const again = await backup.autoIfDue(); assert.ok(again && again.ok);           // เกิน 6 ชม. แล้ว
   db.setSetting('auto_backup', '0'); const f2 = path.join(backup.backupDir(), again.name); fs.utimesSync(f2, old, old);
-  assert.equal(backup.autoIfDue(), null);                                   // ปิดสำรองอัตโนมัติ
+  assert.equal(await backup.autoIfDue(), null);                             // ปิดสำรองอัตโนมัติ
 });
-test('เก็บเฉพาะ N ชุดล่าสุด', () => {
+test('เก็บเฉพาะ N ชุดล่าสุด', async () => {
   db.setSetting('backup_keep', '3');
-  for (let i = 0; i < 5; i++) { const r = backup.run('auto'); assert.ok(r.ok); const f = path.join(backup.backupDir(), r.name); const t = new Date(Date.now() - (10 - i) * 1000); fs.utimesSync(f, t, t); }
+  for (let i = 0; i < 5; i++) { const r = await backup.runAll('auto'); assert.ok(r.ok); const f = path.join(backup.backupDir(), r.name); const t = new Date(Date.now() - (10 - i) * 1000); fs.utimesSync(f, t, t); }
   const autos = backup.list().filter(b => b.name.startsWith('auto-')); assert.ok(autos.length <= 3, 'เหลือ ' + autos.length);
 });
-test('สำรองตอนปิดโปรแกรม (เปิด/ปิดได้)', () => {
-  db.setSetting('backup_on_exit', '1'); const r = backup.onExit(); assert.ok(r && r.ok && r.name.startsWith('exit-'));
-  db.setSetting('backup_on_exit', '0'); assert.equal(backup.onExit(), null);
+test('สำรองตอนปิดโปรแกรม (เปิด/ปิดได้)', async () => {
+  db.setSetting('backup_on_exit', '1'); const r = await backup.onExit(); assert.ok(r && r.ok && r.name.startsWith('exit-'));
+  db.setSetting('backup_on_exit', '0'); assert.equal(await backup.onExit(), null);
+});
+test('สำรองเป็นไฟล์ Excel ทุกครั้ง (รับ+ส่ง คนละแผ่นงาน) และคัดลอกไปโฟลเดอร์ที่สอง / ปิดได้', async () => {
+  const ExcelJS = require('exceljs');
+  books.create('out', { book_date: '2026-03-06', subject: 'ส่งทดสอบ Excel', to_org: 'ปลายทาง' });
+  db.setSetting('backup_excel', '1'); db.setSetting('backup_dir2', dir2);
+  const r = await backup.runAll('backup'); assert.ok(r.ok && r.excel && /^registers-backup-\d{8}-\d{6}\.xlsx$/.test(r.excel), JSON.stringify(r));
+  assert.ok(fs.existsSync(path.join(backup.backupDir(), r.excel)) && fs.existsSync(path.join(dir2, r.excel)));
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.readFile(path.join(backup.backupDir(), r.excel));
+  assert.deepEqual(wb.worksheets.map(w => w.name), ['ทะเบียนหนังสือรับ', 'ทะเบียนหนังสือส่ง']);
+  assert.equal(wb.worksheets[0].getCell('F5').value, 'ทดสอบสำรอง'); assert.equal(wb.worksheets[1].getCell('F5').value, 'ส่งทดสอบ Excel');
+  db.setSetting('backup_excel', '0'); const r2 = await backup.runAll('backup'); assert.ok(r2.ok && !r2.excel);
+  db.setSetting('backup_excel', '1');
 });

@@ -78,16 +78,32 @@ function prune(dir, prefix, keep) {
 
 function list(dir = backupDir()) {
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(n => /^[\w.-]+\.zip$/.test(n)).map(n => {
+  return fs.readdirSync(dir).filter(n => /^[\w.-]+\.(zip|xlsx)$/.test(n)).map(n => {
     const st = fs.statSync(path.join(dir, n));
     return { name: n, size: st.size, at: st.mtime.toISOString() };
   }).sort((a, b) => (a.at < b.at ? 1 : -1));
 }
 function filePath(name) {
-  if (!/^[\w.-]+\.zip$/.test(name || '')) throw new U.HttpError(400, 'ชื่อไฟล์ไม่ถูกต้อง');
+  if (!/^[\w.-]+\.(zip|xlsx)$/.test(name || '')) throw new U.HttpError(400, 'ชื่อไฟล์ไม่ถูกต้อง');
   const p = path.join(backupDir(), name);
   if (!fs.existsSync(p)) throw new U.HttpError(404, 'ไม่พบไฟล์สำรอง');
   return p;
+}
+
+// สำรอง zip + ไฟล์ Excel (ถ้าเปิดไว้) — Excel ล้มเหลวไม่ทำให้การสำรองหลักล้มเหลว แต่แจ้งเตือน
+async function runAll(prefix = 'backup') {
+  const res = run(prefix);
+  if (!res.ok || db.getSettings().backup_excel !== '1') return res;
+  try {
+    const buf = await require('./export').makeXlsxAll();
+    const stamp = res.name.replace(/^[a-z-]+?-(\d{8}-\d{6})\.zip$/, '$1');
+    const name = `registers-${prefix}-${stamp}.xlsx`;
+    const targets = [backupDir(), backupDir2()].filter(Boolean);
+    for (const [i, d] of targets.entries()) { try { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name), buf); } catch (e) { if (i === 0) throw e; res.warn = (res.warn ? res.warn + ' · ' : '') + 'คัดลอกไฟล์ Excel ไปโฟลเดอร์ที่สองไม่สำเร็จ'; } }
+    res.excel = name;
+    if (prefix === 'auto' || prefix === 'exit') { const keep = prefix === 'exit' ? 10 : Math.max(3, parseInt(db.getSettings().backup_keep, 10) || 30); for (const d of targets) prune(d, `registers-${prefix}-`, keep); }
+  } catch (e) { res.warn = (res.warn ? res.warn + ' · ' : '') + 'สำรองข้อมูลสำเร็จ แต่สร้างไฟล์ Excel ไม่สำเร็จ: ' + e.message; }
+  return res;
 }
 
 function autoIfDue() {
@@ -96,7 +112,7 @@ function autoIfDue() {
   const hours = Math.max(1, parseInt(s.backup_every_hours, 10) || 24);
   const last = list().find(b => b.name.startsWith('auto-'));
   if (last && Date.now() - new Date(last.at).getTime() < (hours * 60 - 2) * 60 * 1000) return null;
-  return run('auto');
+  return runAll('auto');
 }
 
 /* ---------- กู้คืน ---------- */
@@ -147,6 +163,6 @@ function restoreFromZip(zipPath) {
   } finally { fs.rmSync(stage, { recursive: true, force: true }); }
 }
 
-function onExit() { return db.getSettings().backup_on_exit === '1' ? run('exit') : null; }
+function onExit() { return db.getSettings().backup_on_exit === '1' ? runAll('exit') : null; }
 
-module.exports = { run, list, onExit, backupDir2, filePath, autoIfDue, restoreFromZip, backupDir, log: () => log };
+module.exports = { run, runAll, list, onExit, backupDir2, filePath, autoIfDue, restoreFromZip, backupDir, log: () => log };
