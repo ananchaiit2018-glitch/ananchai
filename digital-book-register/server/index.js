@@ -8,6 +8,7 @@ const db = require('./db');
 const books = require('./books');
 const fonts = require('./fonts');
 const exp = require('./export');
+const live = require('./liveexcel');
 const backup = require('./backup');
 const auth = require('./auth');
 const U = require('./util');
@@ -50,10 +51,15 @@ function createApp() {
 
   /* --- สถานะ / ตั้งค่า --- */
   const publicSettings = () => { const s = db.getSettings(); delete s.password_hash; return s; };
+  // บันทึก/แก้ไข/ยกเลิก/กู้คืน/เปลี่ยนตั้งค่า สำเร็จ -> อัปเดตไฟล์ Excel อัตโนมัติ
+  app.use('/api', (req, res, next) => {
+    if (req.method !== 'GET' && /^\/(books|backup\/restore|settings)/.test(req.path)) res.on('finish', () => { if (res.statusCode < 300) live.schedule(); });
+    next();
+  });
   app.get('/api/state', wrap((req, res) => {
     const s = publicSettings();
     res.json({ settings: s, has_password: auth.required(), year: books.registrationYear(), fonts: fonts.status(), data_dir: cfg.DATA_DIR,
-      backup_dir: backup.backupDir(), version: cfg.VERSION, months: U.MONTHS });
+      backup_dir: backup.backupDir(), version: cfg.VERSION, months: U.MONTHS, is_local: isLocal(req) });
   }));
   app.put('/api/settings', wrap((req, res) => {
     const b = req.body || {}; const old = db.getSettings(); const out = {};
@@ -88,6 +94,7 @@ function createApp() {
     if (b.backup_every_hours !== undefined) { const n = parseInt(b.backup_every_hours, 10); if (![1, 3, 6, 12, 24, 72, 168].includes(n)) throw new U.HttpError(400, 'ความถี่การสำรองไม่ถูกต้อง'); out.backup_every_hours = String(n); }
     if (b.backup_keep !== undefined) { const n = parseInt(b.backup_keep, 10); if (!(n >= 3 && n <= 365)) throw new U.HttpError(400, 'จำนวนชุดที่เก็บต้องอยู่ระหว่าง 3-365'); out.backup_keep = String(n); }
     if (b.backup_excel !== undefined) out.backup_excel = b.backup_excel ? '1' : '0';
+    if (b.live_excel !== undefined) out.live_excel = b.live_excel ? '1' : '0';
     if (b.backup_on_exit !== undefined) out.backup_on_exit = b.backup_on_exit ? '1' : '0';
     if (b.backup_dir2 !== undefined) {
       const v = String(b.backup_dir2).trim();
@@ -182,6 +189,22 @@ function createApp() {
     throw new U.HttpError(400, 'รูปแบบไฟล์ไม่ถูกต้อง');
   }));
 
+  /* --- ไฟล์ Excel อัปเดตอัตโนมัติ / ส่งออก Excel ทั้งหมด --- */
+  app.get('/api/live-excel', wrap((req, res) => res.json(live.status())));
+  app.post('/api/live-excel/update', wrap(async (req, res) => res.json(await live.write())));
+  app.post('/api/live-excel/open', wrap(async (req, res) => {
+    if (!isLocal(req)) throw new U.HttpError(403, 'เปิดไฟล์ได้เฉพาะที่เครื่องหลัก — ใช้ปุ่มดาวน์โหลดแทน');
+    let s = live.status(); if (!fs.existsSync(s.file)) s = await live.write();
+    if (!fs.existsSync(s.file)) throw new U.HttpError(400, s.error || 'ยังไม่มีไฟล์ Excel');
+    const folder = (req.body || {}).folder;
+    if (process.platform === 'win32') require('child_process').exec(folder ? `explorer /select,"${s.file}"` : `start "" "${s.file}"`);
+    res.json({ ok: true, file: s.file });
+  }));
+  app.get('/api/export-all/xlsx', wrap(async (req, res) => {
+    const d = new Date(); const stamp = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear() + 543}`;
+    send(res, await exp.makeXlsxAll('ข้อมูลทั้งหมด ณ ' + d.toLocaleString('th-TH', { hour12: false })), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'ทะเบียนหนังสือรับ-ส่ง-ทั้งหมด-' + stamp, '.xlsx', true);
+  }));
+
   /* --- สำรอง / กู้คืน --- */
   app.get('/api/backup', wrap((req, res) => res.json({ dir: backup.backupDir(), dir2: backup.backupDir2(), items: backup.list(), log: backup.log() })));
   app.post('/api/backup/run', wrap(async (req, res) => res.json(await backup.runAll('backup'))));
@@ -228,6 +251,7 @@ function start() {
   Promise.resolve(backup.autoIfDue()).then(auto => { if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}${auto.excel ? ' + ' + auto.excel : ''}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`); }).catch(e => console.error(e));
   const timer = setInterval(() => { Promise.resolve(backup.autoIfDue()).catch(e => console.error(e)); }, 10 * 60 * 1000); timer.unref();
   const openBrowser = () => { if (process.argv.includes('--open') && process.platform === 'win32') require('child_process').exec(`start "" "http://localhost:${cfg.PORT}"`); };
+  live.schedule(300);
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
     openBrowser();
     console.log(`ระบบทะเบียนหนังสือรับ-ส่ง พร้อมใช้งานที่  http://localhost:${cfg.PORT}`);

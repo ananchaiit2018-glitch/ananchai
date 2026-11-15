@@ -63,9 +63,36 @@ async function viewDashboard() {
     <div class="card"><div class="quick">
       <a class="btn primary big" href="#/new/in">📥 เพิ่มหนังสือรับ</a><a class="btn primary big" href="#/new/out">📤 เพิ่มหนังสือส่ง</a>
       <a class="btn big" href="#/search">🔍 ค้นหาหนังสือ</a><a class="btn big" href="#/reports?kind=in&scope=all&auto=1">🖨️ พิมพ์ทะเบียนรับ (ทั้งฉบับ)</a><a class="btn big" href="#/reports?kind=out&scope=all&auto=1">🖨️ พิมพ์ทะเบียนส่ง (ทั้งฉบับ)</a><a class="btn big" href="#/reports?export=1">📊 ส่งออกข้อมูล</a></div></div>
+    <div class="card xlcard" id="xlcard"></div>
     <div class="card"><h2>รายการล่าสุด</h2>${d.recent.length ? `<div class="tw" style="max-height:none"><table class="t"><thead><tr><th></th><th>เลขทะเบียน</th><th>ที่</th><th>ลงวันที่</th><th>เรื่อง</th><th>จาก/ถึง</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">ยังไม่มีรายการ เริ่มต้นด้วยการกด "เพิ่มหนังสือรับ" หรือ "เพิ่มหนังสือส่ง"</p>'}
     ${d.cancelled ? `<p class="muted">รายการที่ยกเลิก (ยังเก็บเลขทะเบียนไว้): ${d.cancelled} รายการ</p>` : ''}</div>`;
   $$('tr.click', m).forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id));
+  liveExcelCard($('#xlcard'));
+}
+
+/* ---------- การ์ดไฟล์ Excel อัปเดตอัตโนมัติ ---------- */
+function downloadAllXlsx() {
+  fetch('/api/export-all/xlsx', { credentials: 'same-origin' }).then(async r => {
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'ส่งออกไม่สำเร็จ');
+    const cd = r.headers.get('content-disposition') || ''; const nm = decodeURIComponent((/filename\*=UTF-8''([^;]+)/.exec(cd) || [])[1] || 'ทะเบียน.xlsx');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = nm; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('ดาวน์โหลด Excel แล้ว: ' + nm, 'ok');
+  }).catch(e => toast(e.message, 'err'));
+}
+async function liveExcelCard(el) {
+  const s = await api('/api/live-excel').catch(() => null); if (!s || !el.isConnected) return;
+  const local = S.st.is_local;
+  el.innerHTML = `<div class="xlhead"><div class="xlicon">📊</div><div class="grow"><h2 style="margin:0">ไฟล์ Excel อัปเดตอัตโนมัติ</h2>
+      <div class="muted" style="font-size:.92rem">${s.enabled ? 'บันทึกรายการเมื่อไร ไฟล์ Excel จะเพิ่มรายการต่อท้ายให้ทันที (ทะเบียนรับ + ทะเบียนส่ง คนละแผ่นงาน)' : 'ปิดอยู่ — เปิดได้ที่หน้า "สำรองข้อมูล"'}</div></div>
+      ${s.enabled ? `<span class="xlstate ${s.error ? 'bad' : 'good'}">${s.error ? '⚠️ ยังไม่อัปเดต' : s.at ? '✅ อัปเดตแล้ว ' + fmtStamp(s.at) : '⏳ กำลังเตรียมไฟล์'}</span>` : ''}</div>
+    ${s.error ? `<div class="notice warn" style="margin-top:10px">${esc(s.error)}</div>` : ''}${s.warn2 ? `<div class="notice warn" style="margin-top:10px">${esc(s.warn2)}</div>` : ''}
+    ${s.enabled ? `<div class="muted xlpath">📄 ${esc(s.file)}${s.copy2 ? '<br>📄 สำเนา: ' + esc(s.copy2) : ''}</div>` : ''}
+    <div class="row" style="margin-top:10px">${local && s.enabled ? '<button class="btn primary" id="xlopen">📂 เปิดไฟล์ Excel</button><button class="btn" id="xlfolder">📁 เปิดโฟลเดอร์</button>' : ''}
+      <button class="btn" id="xldl">⬇ ส่งออก Excel (รับ+ส่ง ทั้งหมด)</button>${s.enabled ? '<button class="btn" id="xlnow">🔄 อัปเดตตอนนี้</button>' : ''}</div>`;
+  const open = folder => async () => { try { await api('/api/live-excel/open', { json: { folder } }); toast(folder ? 'เปิดโฟลเดอร์แล้ว' : 'กำลังเปิดไฟล์ใน Excel… (ถ้าเปิดค้างไว้ ระบบจะอัปเดตไม่ได้จนกว่าจะปิด)', 'ok', 6000); } catch (e) { toast(e.message, 'err', 7000); } };
+  if ($('#xlopen', el)) { $('#xlopen', el).onclick = open(false); $('#xlfolder', el).onclick = open(true); }
+  $('#xldl', el).onclick = downloadAllXlsx;
+  if ($('#xlnow', el)) $('#xlnow', el).onclick = async () => { const r = await api('/api/live-excel/update', { method: 'POST' }).catch(e => ({ error: e.message })); toast(r.error || 'อัปเดตไฟล์ Excel แล้ว', r.error ? 'err' : 'ok'); liveExcelCard(el); };
 }
 
 /* ---------- ช่องเลือกจากรายการ (+ พิมพ์เอง) ---------- */
@@ -201,9 +228,10 @@ async function viewList(kind) {
       <select id="status" style="width:150px"><option value="">ทุกสถานะ</option><option value="active">ใช้งาน</option><option value="cancelled">ยกเลิกแล้ว</option></select>
       <select id="sort" style="width:190px"><option value="reg:desc">เลขทะเบียน (ใหม่→เก่า)</option><option value="reg:asc">เลขทะเบียน (เก่า→ใหม่)</option><option value="date:desc">ลงวันที่ (ใหม่→เก่า)</option><option value="date:asc">ลงวันที่ (เก่า→ใหม่)</option></select></div>
       <div class="row" style="margin-top:10px"><span id="count" class="muted"></span><span class="grow"></span>
-        <button class="btn sm" id="prSel" disabled>🖨️ พิมพ์ที่เลือก</button><button class="btn sm" id="prAll">🖨️ พิมพ์/ส่งออกตามตัวกรองนี้</button></div></div>
+        <button class="btn sm" id="prSel" disabled>🖨️ พิมพ์ที่เลือก</button><button class="btn sm" id="prAll">🖨️ พิมพ์/ส่งออกตามตัวกรองนี้</button><button class="btn sm" id="xlAll">📊 ส่งออก Excel ทั้งหมด</button></div></div>
     <div class="tw"><table class="t"><thead><tr><th><input type="checkbox" id="selAll" aria-label="เลือกทั้งหมด"></th>${isAll ? '<th>ประเภท</th>' : ''}<th>เลขทะเบียน</th><th>ที่</th><th>ลงวันที่</th><th>จาก</th><th>ถึง</th><th>เรื่อง</th><th>การปฏิบัติ</th><th>หมายเหตุ</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="pager" id="pager"></div>`;
+  $('#xlAll').onclick = downloadAllXlsx;
   let seq = 0;
   async function load() {
     const my = ++seq;
@@ -498,6 +526,7 @@ async function viewBackup() {
       <div class="row"><label><input type="checkbox" id="auto" ${s.auto_backup === '1' ? 'checked' : ''}> เปิดสำรองอัตโนมัติ</label>
         <span>ทุก</span><select id="every" style="width:150px">${[[1, '1 ชั่วโมง'], [3, '3 ชั่วโมง'], [6, '6 ชั่วโมง'], [12, '12 ชั่วโมง'], [24, '1 วัน'], [72, '3 วัน'], [168, '7 วัน']].map(([v, t]) => `<option value="${v}" ${String(v) === s.backup_every_hours ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <span>เก็บไว้</span><input type="number" id="keep" min="3" max="365" value="${esc(s.backup_keep)}" style="width:90px"><span>ชุดล่าสุด</span></div>
+      <div class="row" style="margin-top:8px"><label><input type="checkbox" id="livexl" ${s.live_excel !== '0' ? 'checked' : ''}> <b>ไฟล์ Excel อัปเดตอัตโนมัติ</b> ทุกครั้งที่บันทึก/แก้ไข/ยกเลิกรายการ (ไฟล์เดียว เพิ่มรายการต่อท้ายเรื่อยๆ เก็บในโฟลเดอร์สำรอง + โฟลเดอร์ที่สอง)</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="xl" ${s.backup_excel === '1' ? 'checked' : ''}> สำรองเป็นไฟล์ <b>Excel (.xlsx)</b> ด้วย (ทะเบียนรับ+ส่ง ทุกรายการ) เปิดดู/แก้ไขได้โดยไม่ต้องใช้โปรแกรมนี้</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="onexit" ${s.backup_on_exit === '1' ? 'checked' : ''}> สำรองให้อัตโนมัติทุกครั้งที่กด "ปิดโปรแกรม"</label></div>
       <div class="field" style="margin-top:10px"><label class="f">สำรองซ้ำไปอีกที่ <small>(เช่น แฟลชไดรฟ์ E:\\Backup — แนะนำมาก เพราะถ้าดิสก์เสีย ไฟล์สำรองในเครื่องเดียวกันหายด้วย)</small></label>
@@ -515,7 +544,7 @@ async function viewBackup() {
   $('#bdirpick').onclick = async () => { const p = await pickFolder($('#bdir').value); if (p) { $('#bdir').value = p; $('#bdirsave').click(); } };
   $('#bdir2pick').onclick = async () => { const p = await pickFolder($('#bdir2').value); if (p) { $('#bdir2').value = p; $('#autosave').click(); } };
   $('#autosave').onclick = async () => {
-    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, backup_dir2: $('#bdir2').value } });
+    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, live_excel: $('#livexl').checked, backup_dir2: $('#bdir2').value } });
       toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }
   };
   $('#bdirsave').onclick = async () => { try { await api('/api/settings', { method: 'PUT', json: { backup_dir: $('#bdir').value } }); toast('บันทึกตำแหน่งสำรองข้อมูลแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };

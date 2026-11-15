@@ -49,3 +49,18 @@ test('สำรองเป็นไฟล์ Excel ทุกครั้ง (�
   db.setSetting('backup_excel', '0'); const r2 = await backup.runAll('backup'); assert.ok(r2.ok && !r2.excel);
   db.setSetting('backup_excel', '1');
 });
+test('ไฟล์ Excel อัปเดตอัตโนมัติ: ไฟล์เดียว เพิ่มรายการต่อท้าย / คัดลอกไปโฟลเดอร์ที่สอง / ปิดได้', async () => {
+  const ExcelJS = require('exceljs'); const live = require('../server/liveexcel');
+  db.setSetting('live_excel', '1'); db.setSetting('backup_dir2', dir2);
+  const count = async f => { const wb = new ExcelJS.Workbook(); await wb.xlsx.readFile(f); return wb.worksheets.map(w => w.actualRowCount); };
+  const s1 = await live.write(); assert.ok(!s1.error, s1.error); assert.ok(fs.existsSync(s1.file) && fs.existsSync(path.join(dir2, live.NAME)));
+  const before = await count(s1.file);
+  books.create('in', { book_date: '2026-03-07', subject: 'รายการใหม่ต่อท้าย' });
+  const s2 = await live.write(); const after = await count(s2.file);
+  assert.equal(after[0], before[0] + 1); assert.equal(after[1], before[1]);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.readFile(s2.file); const ws = wb.worksheets[0];
+  assert.equal(ws.getCell('F' + ws.actualRowCount).value, 'รายการใหม่ต่อท้าย');
+  assert.ok(!backup.list().some(b => b.name === live.NAME));          // ไม่ปนกับรายการไฟล์สำรอง
+  db.setSetting('live_excel', '0'); const t = fs.statSync(s2.file).mtimeMs; await live.write(); assert.equal(fs.statSync(s2.file).mtimeMs, t);
+  db.setSetting('live_excel', '1');
+});

@@ -89,9 +89,9 @@ async function makeXlsx(q) {
 }
 
 // ไฟล์ Excel สำหรับสำรองข้อมูล: ทะเบียนรับ + ทะเบียนส่ง ทุกรายการ (รวมที่ยกเลิก) คนละแผ่นงาน
-async function makeXlsxAll() {
+async function makeXlsxAll(line = 'ทั้งหมด (ไฟล์สำรองข้อมูล)') {
   const { wb, s, fam, color } = newBook(false);
-  for (const kind of ['in', 'out']) addSheet(wb, kind, books.listForExport({ kind }), 'ทั้งหมด (ไฟล์สำรองข้อมูล)', fam, color, s);
+  for (const kind of ['in', 'out']) addSheet(wb, kind, books.listForExport({ kind }), line, fam, color, s);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
