@@ -40,6 +40,20 @@
   </section>
 
   <section>
+    <h2>เลือกเกม (เปิดลิงก์นี้ใน OBS / LIVE Studio)</h2>
+    <div class="row">
+      <a href="/" target="_blank"><button>🪷 ลอยกระทง — http://localhost:8080/</button></a>
+      <a href="/boss.html" target="_blank"><button>⚔️ ปราบอสูร — http://localhost:8080/boss.html</button></a>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-scene="bossAttack">👹 ให้อสูรโจมตีตอนนี้</button>
+      <button data-scene="bossNext">⏭ ข้ามไปอสูรตัวถัดไป</button>
+      <button data-scene="bossReset">♻️ เริ่มด่าน 1 ใหม่</button>
+    </div>
+    <p class="hint">ปุ่มควบคุมด้านล่างใช้ได้ทั้งสองเกม</p>
+  </section>
+
+  <section>
     <h2>2) ควบคุมฉาก</h2>
     <div class="row">
       <button data-scene="round">🪷 เริ่มรอบลอยพร้อมกันเลย</button>
@@ -58,7 +72,7 @@
     <h2>3) ทดสอบอีเวนต์</h2>
     <div class="row">
       <input id="simName" value="ทดสอบ" style="max-width:180px">
-      <input id="simText" value="ลอย ขอให้ทุกคนมีความสุข 🙏">
+      <input id="simText" value="ลอย ขอให้ทุกคนมีความสุข 🙏" list="cmds"><datalist id="cmds"><option value="ตี"><option value="กัน"><option value="ฮีล"><option value="รำ"></datalist>
       <button id="simChat">💬 ส่งคอมเมนต์</button>
     </div>
     <div class="row" style="margin-top:8px">

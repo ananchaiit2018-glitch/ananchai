@@ -172,6 +172,7 @@ server.listen(PORT, HOST, () => {
   console.log('==============================================');
   console.log(' ลอยกระทงไลฟ์ — พร้อมใช้งาน');
   console.log(` ฉาก (ใส่ใน OBS/LIVE Studio):  http://localhost:${PORT}/`);
+  console.log(` เกมปราบอสูร:               http://localhost:${PORT}/boss.html`);
   console.log(` แผงควบคุม/ทดสอบ:            http://localhost:${PORT}/control.html`);
   console.log(DEMO ? ' โหมดเดโม: มีผู้ชมจำลองเดินเข้างานอัตโนมัติ' : '');
   console.log('==============================================');
