@@ -1,0 +1,16 @@
+{
+  "name": "loykrathong-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ฉากลอยกระทงแบบเรียลไทม์สำหรับ TikTok LIVE (คอมเมนต์/ของขวัญ/หัวใจ ควบคุมตัวละครบนจอ)",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node server.js --demo"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.0.0",
+    "ws": "^8.18.0"
+  }
+}

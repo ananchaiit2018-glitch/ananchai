@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แผงควบคุมลอยกระทงไลฟ์</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0f1030; --card: #1b1c4a; --line: #3a3c7a; --gold: #f3c55a; --text: #f4f2ff; --muted: #a9a8d4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Kanit, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { color: var(--gold); font-size: 26px; margin: 8px 0 16px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  h2 { font-size: 17px; margin: 0 0 10px; color: var(--gold); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input { flex: 1; min-width: 160px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0c0d28; color: var(--text); font: inherit; }
+  button { padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: #2a2c66; color: var(--text); font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #2a1a00; border-color: var(--gold); font-weight: 600; }
+  #status { margin-top: 10px; color: var(--muted); font-size: 15px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #888; margin-right: 6px; }
+  p.hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  code { background: #0c0d28; padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🪷 แผงควบคุมลอยกระทงไลฟ์</h1>
+
+  <section>
+    <h2>1) เชื่อมต่อไลฟ์ TikTok</h2>
+    <div class="row">
+      <input id="user" placeholder="ชื่อบัญชี TikTok เช่น @mychannel">
+      <button class="primary" id="connect">เชื่อมต่อ</button>
+      <button id="disconnect">ตัดการเชื่อมต่อ</button>
+    </div>
+    <div id="status"><span class="dot"></span>กำลังต่อเซิร์ฟเวอร์…</div>
+    <p class="hint">ต้องเปิดไลฟ์ก่อนแล้วค่อยกดเชื่อมต่อ (ถ้ายังไม่ไลฟ์ ระบบจะลองใหม่ให้เองเรื่อย ๆ)</p>
+  </section>
+
+  <section>
+    <h2>2) ควบคุมฉาก</h2>
+    <div class="row">
+      <button data-scene="round">🪷 เริ่มรอบลอยพร้อมกันเลย</button>
+      <button data-scene="fireworks">🎆 จุดพลุ</button>
+      <button data-scene="lanterns">🏮 ปล่อยโคม</button>
+      <button data-scene="clear">🧹 ล้างตัวละคร</button>
+      <button data-scene="resetBoard">♻️ รีเซ็ตอันดับ/เป้าหัวใจ</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="demoOn">▶️ เปิดผู้ชมจำลอง</button>
+      <button id="demoOff">⏹ ปิดผู้ชมจำลอง</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>3) ทดสอบอีเวนต์</h2>
+    <div class="row">
+      <input id="simName" value="ทดสอบ" style="max-width:180px">
+      <input id="simText" value="ลอย ขอให้ทุกคนมีความสุข 🙏">
+      <button id="simChat">💬 ส่งคอมเมนต์</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-gift="Rose,1">🌹 Rose (1)</button>
+      <button data-gift="Finger Heart,5">🫰 5</button>
+      <button data-gift="Doughnut,30">🍩 30</button>
+      <button data-gift="Hand Hearts,100">🫶 100</button>
+      <button data-gift="Rocket,299">🚀 299</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="simLike">❤️ กดใจ 200</button>
+      <button id="simJoin">👋 เข้าห้อง</button>
+      <button id="simFollow">💖 ติดตาม</button>
+      <button id="simShare">🔁 แชร์</button>
+    </div>
+  </section>
+</main>
+<script>
+  let ws;
+  const $ = s => document.querySelector(s);
+  const COLORS = { connected: '#3ddc84', connecting: '#ffb020', reconnecting: '#ffb020', idle: '#888', ended: '#ff6b6b' };
+  const LABEL = { connected: 'เชื่อมต่อไลฟ์แล้ว', connecting: 'กำลังเชื่อมต่อ…', reconnecting: 'กำลังลองใหม่', idle: 'ยังไม่ได้เชื่อมต่อ', ended: 'ไลฟ์จบแล้ว' };
+  function open() {
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    ws.onmessage = e => {
+      const m = JSON.parse(e.data);
+      if (m.type !== 'status') return;
+      $('#status').innerHTML = '';
+      const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = COLORS[m.state] || '#888';
+      $('#status').append(dot, `${LABEL[m.state] || m.state}${m.username ? ' — @' + m.username : ''} ${m.message || ''}`);
+      if (m.username && !$('#user').value) $('#user').value = m.username;
+    };
+    ws.onclose = () => { $('#status').textContent = 'หลุดจากเซิร์ฟเวอร์ — เปิด npm start อยู่ไหม?'; setTimeout(open, 2000); };
+  }
+  open();
+  const send = m => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
+  const simUser = () => { const n = $('#simName').value.trim() || 'ทดสอบ'; return { id: 'sim-' + n, name: n, avatar: '' }; };
+  const sim = event => send({ cmd: 'sim', event });
+  $('#connect').onclick = () => send({ cmd: 'connect', username: $('#user').value });
+  $('#disconnect').onclick = () => send({ cmd: 'disconnect' });
+  $('#demoOn').onclick = () => send({ cmd: 'demo', on: true });
+  $('#demoOff').onclick = () => send({ cmd: 'demo', on: false });
+  document.querySelectorAll('[data-scene]').forEach(b => b.onclick = () => send({ cmd: 'scene', action: b.dataset.scene }));
+  document.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => {
+    const [name, d] = b.dataset.gift.split(',');
+    sim({ type: 'gift', user: simUser(), gift: { name, diamonds: +d, count: 1 } });
+  });
+  $('#simChat').onclick = () => sim({ type: 'chat', user: simUser(), text: $('#simText').value });
+  $('#simLike').onclick = () => sim({ type: 'like', user: simUser(), likes: 200 });
+  $('#simJoin').onclick = () => sim({ type: 'join', user: simUser() });
+  $('#simFollow').onclick = () => sim({ type: 'follow', user: simUser() });
+  $('#simShare').onclick = () => sim({ type: 'share', user: simUser() });
+</script>
+</body>
+</html>
