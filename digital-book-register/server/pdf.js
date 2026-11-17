@@ -59,6 +59,7 @@ function wrap(doc, text, width) {
   const lines = [];
   for (const para of String(text).split('\n')) {
     if (para === '') { lines.push(''); continue; }
+    if (para[0] === '\u0001') { lines.push(para); continue; }   // ห้ามตัดบรรทัด
     const words = seg ? [...seg.segment(para)].map(s => s.segment) : para.split(/(?<=\s)/);
     let cur = '';
     const push = () => { lines.push(cur.replace(/\s+$/, '')); cur = ''; };
@@ -190,6 +191,7 @@ function build(opts) {
       doc.font('Reg').fontSize(size).fillColor(dataColor);
       cells[i].forEach((ln, j) => {
         const ty = y + textOff + j * rowPitch;
+        if (ln[0] === '\u0001') { ln = ln.slice(1); const fit = Math.min(size, size * (c.w - PAD * 2) / doc.widthOfString(ln)); doc.fontSize(fit).text(ln, x + PAD, ty + (size - fit) * 0.6, { lineBreak: false }); doc.fontSize(size); return; }
         doc.text(ln, x + PAD, ty, { width: c.w - PAD * 2, align: c.align || 'left', lineBreak: false });
         if (row.status === 'cancelled' && c.key !== 'remark' && ln.trim()) {   // เส้นขีดฆ่า
           const tw = Math.min(doc.widthOfString(ln), c.w - PAD * 2), sx = c.align === 'center' ? x + (c.w - tw) / 2 : x + PAD, sy = ty + size * 0.62;

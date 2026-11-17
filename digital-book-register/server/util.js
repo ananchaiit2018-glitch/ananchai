@@ -23,13 +23,11 @@ function thaiDate(iso, full = false) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return `${d} ${(full ? MONTHS : MONTHS_SHORT)[m - 1]} ${y + 543}`;
 }
-// ข้อความหมายเหตุของรายการที่ยกเลิก: "ยกเลิก (เหตุผล)" + ชื่อผู้ยกเลิก (ยศ+ชื่อ) และวันที่ แทนการลงชื่อกำกับ
+// ข้อความหมายเหตุของรายการที่ยกเลิก: "ยกเลิก (เหตุผล)" + "ยศชื่อ/แก้ไข" กำกับ (เช่น ส.ต.ท.เนวิน/แก้ไข)
 function cancelNote(b) {
   if (b.status !== 'cancelled') return '';
-  const d = b.cancelled_at ? new Date(b.cancelled_at) : null;
-  const ds = d && !isNaN(d) ? `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}` : '';
   const who = shortName(b.cancelled_by || '');
-  return `ยกเลิก${b.cancel_reason ? ` (${b.cancel_reason})` : ''}` + (who || ds ? `\nโดย ${[who, ds].filter(Boolean).join(' ')}` : '');
+  return `ยกเลิก${b.cancel_reason ? ` (${b.cancel_reason})` : ''}` + (who ? `\n\u0001${who}/แก้ไข` : '');
 }
 function thaiDateTime(iso) {
   if (!iso) return '';
