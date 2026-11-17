@@ -6,18 +6,18 @@ const db = require('./db');
 
 const ACTIONS = {
   app_start: 'เปิดโปรแกรม', app_stop: 'ปิดโปรแกรม',
-  login: 'เข้าสู่ระบบ', login_fail: 'เข้าสู่ระบบไม่สำเร็จ', logout: 'ออกจากระบบ',
-  duty_start: 'เข้าเวร', duty_change: 'เปลี่ยนผู้เข้าเวร',
-  book_create: 'เพิ่มหนังสือ', book_update: 'แก้ไขหนังสือ', book_cancel: 'ยกเลิกหนังสือ',
+  login: 'เข้าระบบ', login_fail: 'ใส่รหัสผิด', logout: 'ออกจากระบบ',
+  duty_start: 'เข้าเวร', duty_change: 'เปลี่ยนคนเข้าเวร',
+  book_create: 'ลงหนังสือใหม่', book_update: 'แก้หนังสือ', book_cancel: 'ยกเลิกหนังสือ',
   attach_add: 'แนบไฟล์', attach_remove: 'ลบไฟล์แนบ',
-  print: 'พิมพ์ทะเบียน', export: 'ส่งออกข้อมูล',
-  settings: 'แก้ไขตั้งค่า', counters: 'ตั้งเลขทะเบียนถัดไป', password: 'รหัสผ่าน', font: 'ฟอนต์', logo: 'โลโก้',
-  backup: 'สำรองข้อมูล', backup_auto: 'สำรองอัตโนมัติ', restore: 'กู้คืนข้อมูล',
+  print: 'สั่งพิมพ์', export: 'โหลดไฟล์ออก',
+  settings: 'แก้ตั้งค่า', counters: 'ตั้งเลขทะเบียนใหม่', password: 'เปลี่ยนรหัสผ่าน', font: 'เปลี่ยนฟอนต์', logo: 'เปลี่ยนโลโก้',
+  backup: 'สำรองข้อมูล', backup_auto: 'สำรองอัตโนมัติ', restore: 'กู้ข้อมูลคืน',
 };
 const GROUPS = {
-  access: { label: 'การเข้าใช้งาน', actions: ['app_start', 'app_stop', 'login', 'login_fail', 'logout', 'duty_start', 'duty_change'] },
-  register: { label: 'การลงทะเบียนหนังสือ', actions: ['book_create', 'book_update', 'book_cancel', 'attach_add', 'attach_remove'] },
-  output: { label: 'พิมพ์ / ส่งออก', actions: ['print', 'export'] },
+  access: { label: 'เปิดโปรแกรม / เข้าเวร', actions: ['app_start', 'app_stop', 'login', 'login_fail', 'logout', 'duty_start', 'duty_change'] },
+  register: { label: 'ลงทะเบียนหนังสือ', actions: ['book_create', 'book_update', 'book_cancel', 'attach_add', 'attach_remove'] },
+  output: { label: 'พิมพ์ / โหลดไฟล์', actions: ['print', 'export'] },
   system: { label: 'ตั้งค่า / สำรองข้อมูล', actions: ['settings', 'counters', 'password', 'font', 'logo', 'backup', 'backup_auto', 'restore'] },
 };
 

@@ -5,7 +5,7 @@ const KIND = { in: 'หนังสือรับ', out: 'หนังสือ
 const MENU = [
   ['grp', 'งานประจำวัน'], ['dashboard', 'home', 'หน้าหลัก'], ['new/in', 'inbox', 'เพิ่มหนังสือรับ'], ['new/out', 'send', 'เพิ่มหนังสือส่ง'],
   ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['reports', 'printer', 'พิมพ์และส่งออก'],
-  ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'], ['activity', 'log', 'บันทึกการใช้งาน'],
+  ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'], ['activity', 'log', 'ประวัติการใช้งาน'],
 ];
 // ฟอนต์หน้าจอ (ฝังในโปรแกรม ใช้ออฟไลน์ได้) — การพิมพ์/PDF ยังใช้ TH Sarabun เสมอ
 const UI_FONTS = [
@@ -530,17 +530,17 @@ async function viewActivity() {
   const F = { from: todayISO(), to: todayISO(), actor: '', action: '', q: '', page: 1 };
   const meta = await api('/api/activity?limit=1'); if (!m.isConnected) return;
   const grpOf = a => Object.keys(meta.groups).find(g => meta.groups[g].actions.includes(a)) || 'system';
-  m.innerHTML = header('บันทึกการใช้งาน', `<button class="btn" id="lgx">${ic('download')} ส่งออก Excel</button>`, `${ic('log')} ใครเข้าเวร ทำอะไร เมื่อไร จากเครื่องไหน · ระบบบันทึกให้อัตโนมัติ แก้ไขหรือลบไม่ได้`) + `
+  m.innerHTML = header('ประวัติการใช้งาน', `<button class="btn" id="lgx">${ic('download')} โหลดเป็น Excel</button>`, `${ic('log')} ดูว่าใครเข้าเวร ทำอะไรไปบ้าง ตอนไหน · โปรแกรมจดให้เอง ลบหรือแก้ไม่ได้`) + `
     <div class="card"><div class="row" style="margin-bottom:10px"><div class="seg" id="quick">
         <label><input type="radio" name="qr" value="today" checked>วันนี้</label><label><input type="radio" name="qr" value="7">7 วันล่าสุด</label>
-        <label><input type="radio" name="qr" value="month">เดือนนี้</label><label><input type="radio" name="qr" value="all">ทั้งหมด</label><label><input type="radio" name="qr" value="range">เลือกช่วงวันที่</label></div></div>
-      <div class="row" id="rangeRow" hidden><span>ตั้งแต่</span><div id="lgFrom" style="width:220px"></div><span>ถึง</span><div id="lgTo" style="width:220px"></div></div>
+        <label><input type="radio" name="qr" value="month">เดือนนี้</label><label><input type="radio" name="qr" value="all">ทั้งหมด</label><label><input type="radio" name="qr" value="range">เลือกวันเอง</label></div></div>
+      <div class="row" id="rangeRow" hidden><span>ตั้งแต่วันที่</span><div id="lgFrom" style="width:220px"></div><span>ถึงวันที่</span><div id="lgTo" style="width:220px"></div></div>
       <div class="row" style="margin-top:10px">
-        <select id="lgActor" style="width:260px"><option value="">ผู้ทำรายการ: ทุกคน</option>${meta.actors.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
-        <select id="lgAction" style="width:280px"><option value="">การกระทำ: ทั้งหมด</option>${Object.entries(meta.groups).map(([g, x]) => `<optgroup label="${esc(x.label)}"><option value="${g}">— ${esc(x.label)} ทั้งหมด</option>${x.actions.map(a => `<option value="${a}">${esc(meta.actions[a])}</option>`).join('')}</optgroup>`).join('')}</select>
-        <div class="grow"><input type="search" id="lgQ" placeholder="ค้นหาในรายละเอียด เช่น เลขทะเบียน 012/2570 หรือชื่อเรื่อง"></div></div></div>
+        <select id="lgActor" style="width:260px"><option value="">ทุกคน</option>${meta.actors.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+        <select id="lgAction" style="width:280px"><option value="">ทุกเรื่อง</option>${Object.entries(meta.groups).map(([g, x]) => `<optgroup label="${esc(x.label)}"><option value="${g}">— ${esc(x.label)} (ทุกอย่าง)</option>${x.actions.map(a => `<option value="${a}">${esc(meta.actions[a])}</option>`).join('')}</optgroup>`).join('')}</select>
+        <div class="grow"><input type="search" id="lgQ" placeholder="ค้นหา เช่น 012/2570 หรือชื่อเรื่อง"></div></div></div>
     <div id="lgSum" class="lgsum"></div>
-    <div class="tw"><table class="t"><thead><tr><th>วันเวลา</th><th>ผู้ทำรายการ</th><th>การกระทำ</th><th>รายละเอียด</th><th>เครื่อง</th></tr></thead><tbody id="lgRows"></tbody></table></div>
+    <div class="tw"><table class="t"><thead><tr><th>เมื่อไร</th><th>ใคร</th><th>ทำอะไร</th><th>รายละเอียด</th><th>เครื่องไหน</th></tr></thead><tbody id="lgRows"></tbody></table></div>
     <div class="pager" id="lgPager"></div>`;
   const pf = thaiDatePicker(F.from), pt = thaiDatePicker(F.to); $('#lgFrom').append(pf.el); $('#lgTo').append(pt.el);
   const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -556,10 +556,10 @@ async function viewActivity() {
   async function load() {
     const my = ++seq; const r = await api('/api/activity?' + qs({ ...F, limit: 100 })); if (my !== seq || !m.isConnected) return;
     const fmtAt = a => { const d = new Date(a); return `${fmtDate(iso(d))} <b>${p2(d.getHours())}:${p2(d.getMinutes())}</b><small class="muted">:${p2(d.getSeconds())}</small>`; };
-    $('#lgSum').innerHTML = `<span class="muted">${r.total.toLocaleString()} รายการ</span>${r.byActor.map(x => `<button class="chip ${F.actor === x.actor ? 'on' : ''}" data-actor="${esc(x.actor)}"><span class="av sm">${esc(initialOf(x.actor || '?'))}</span>${esc(x.actor || 'ไม่ระบุ')} <b>${x.n}</b></button>`).join('')}`;
+    $('#lgSum').innerHTML = `<span class="muted">ทั้งหมด ${r.total.toLocaleString()} ครั้ง</span>${r.byActor.map(x => `<button class="chip ${F.actor === x.actor ? 'on' : ''}" data-actor="${esc(x.actor)}"><span class="av sm">${esc(initialOf(x.actor || '?'))}</span>${esc(x.actor || 'ไม่รู้ว่าใคร')} <b>${x.n}</b></button>`).join('')}`;
     $('#lgRows').innerHTML = r.rows.map(x => `<tr class="${x.ref_id ? 'click' : ''}" data-ref="${x.ref_id || ''}"><td class="nowrap">${fmtAt(x.at)}</td><td class="nowrap">${x.actor ? `<b>${esc(shortName(x.actor))}</b>` : '<span class="muted">-</span>'}</td>
       <td class="nowrap"><span class="lgtag ${grpOf(x.action)} ${x.action}">${esc(r.actions[x.action] || x.action)}</span></td><td>${esc(x.detail)}</td><td class="nowrap muted">${esc(x.machine)}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">ไม่มีบันทึกในช่วงนี้</td></tr>';
+      || '<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">ช่วงนี้ยังไม่มีใครทำอะไร</td></tr>';
     const pages = Math.max(1, Math.ceil(r.total / r.limit));
     $('#lgPager').innerHTML = pages > 1 ? `<button class="btn sm" data-p="${F.page - 1}" ${F.page <= 1 ? 'disabled' : ''}>‹ ก่อนหน้า</button><span class="muted">หน้า ${F.page} / ${pages}</span><button class="btn sm" data-p="${F.page + 1}" ${F.page >= pages ? 'disabled' : ''}>ถัดไป ›</button>` : '';
     $$('[data-p]', m).forEach(b => b.onclick = () => { F.page = +b.dataset.p; load(); });
@@ -574,9 +574,9 @@ async function viewActivity() {
   $('#lgQ').oninput = debounce(() => { F.q = $('#lgQ').value.trim(); reload(); }, 250);
   $('#lgx').onclick = () => {
     fetch('/api/activity/export?' + qs(F), { credentials: 'same-origin' }).then(async r => {
-      if (!r.ok) throw new Error('ส่งออกไม่สำเร็จ');
+      if (!r.ok) throw new Error('โหลดไฟล์ไม่สำเร็จ');
       const cd = r.headers.get('content-disposition') || ''; const nm = decodeURIComponent((/filename\*=UTF-8''([^;]+)/.exec(cd) || [])[1] || 'log.xlsx');
-      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = nm; document.body.append(a); a.click(); a.remove(); toast('ส่งออกแล้ว: ' + nm, 'ok');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = nm; document.body.append(a); a.click(); a.remove(); toast('โหลดไฟล์แล้ว: ' + nm, 'ok');
     }).catch(e => toast(e.message, 'err'));
   };
   load();

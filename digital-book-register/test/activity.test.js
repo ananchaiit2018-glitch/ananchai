@@ -22,7 +22,7 @@ test('เข้าเวร / เปลี่ยนผู้เข้าเว�
   await jj('/api/duty', { json: { name: N1, prev: '' }, as: N1 });
   await jj('/api/duty', { json: { name: N2, prev: N1 }, as: N2 }); await settle();
   const r = await logs('action=access');
-  assert.equal(r.rows[0].action, 'duty_change'); assert.equal(r.rows[0].actor, N2); assert.match(r.rows[0].detail, /เปลี่ยนจาก ส\.ต\.ท\.อนันต์ชัย/);
+  assert.equal(r.rows[0].action, 'duty_change'); assert.equal(r.rows[0].actor, N2); assert.match(r.rows[0].detail, /รับเวรต่อจาก ส\.ต\.ท\.อนันต์ชัย/);
   assert.equal(r.rows[1].action, 'duty_start'); assert.equal(r.rows[1].actor, N1); assert.equal(r.rows[0].machine, 'เครื่องหลัก');
 });
 
@@ -34,8 +34,8 @@ test('เพิ่ม / แก้ไข / ยกเลิกหนังสื�
   const r = await logs('action=register');
   assert.deepEqual(r.rows.map(x => x.action), ['book_cancel', 'book_update', 'book_create']);
   assert.equal(r.rows[2].actor, N2); assert.match(r.rows[2].detail, new RegExp(`ทะเบียนรับ ${c.reg_label.replace('/', '\\/')} · ทดสอบ log`)); assert.equal(r.rows[2].ref_id, c.id);
-  assert.equal(r.rows[1].actor, N1); assert.match(r.rows[1].detail, /แก้: .*เรื่อง/); assert.match(r.rows[1].detail, /หมายเหตุ/);
-  assert.match(r.rows[0].detail, /เหตุผล: ลงผิด/);
+  assert.equal(r.rows[1].actor, N1); assert.match(r.rows[1].detail, /แก้ช่อง .*เรื่อง/); assert.match(r.rows[1].detail, /หมายเหตุ/);
+  assert.match(r.rows[0].detail, /เพราะ ลงผิด/);
 });
 
 test('ตั้งค่า: บันทึกเฉพาะหัวข้อที่เปลี่ยนจริง / ส่งออก / รหัสผ่านผิด', async () => {
@@ -69,6 +69,6 @@ test('กรองตามผู้ทำรายการ / วันที�
   assert.ok((await get('/api/activity?q=' + encodeURIComponent('ลงผิด'))).rows.every(x => /ลงผิด/.test(x.detail)));
   const x = await fetch(base + '/api/activity/export', { headers: { cookie } }); assert.equal(x.status, 200);
   const ExcelJS = require('exceljs'); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(Buffer.from(await x.arrayBuffer()));
-  const ws = wb.worksheets[0]; assert.equal(ws.name, 'บันทึกการใช้งาน'); assert.equal(ws.actualRowCount, all.total + 1);
+  const ws = wb.worksheets[0]; assert.equal(ws.name, 'ประวัติการใช้งาน'); assert.equal(ws.actualRowCount, all.total + 1);
   assert.equal(ws.getCell('D2').value, 'เข้าเวร');   // เรียงเก่า -> ใหม่
 });
