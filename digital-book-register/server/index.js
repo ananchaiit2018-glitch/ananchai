@@ -44,7 +44,7 @@ function createApp() {
     from_options: 'ตัวเลือก จาก', to_options: 'ตัวเลือก ถึง', org_name: 'ชื่อหน่วยงาน', dept_name: 'ชื่อส่วนราชการ', year_mode: 'ปีที่ใช้ออกเลข',
     reg_format: 'รูปแบบเลขทะเบียน', reg_pad: 'จำนวนหลัก', start_in: 'เลขเริ่มต้นรับ', start_out: 'เลขเริ่มต้นส่ง', ui_font: 'ฟอนต์หน้าจอ', ui_scale: 'ขนาดตัวอักษร',
     print_font_size: 'ขนาดตัวอักษรพิมพ์', data_color: 'สีตัวอักษร', auto_backup: 'สำรองอัตโนมัติ', backup_every_hours: 'ความถี่สำรอง', backup_keep: 'จำนวนชุดสำรอง',
-    backup_on_exit: 'สำรองตอนปิดโปรแกรม', backup_excel: 'สำรองเป็น Excel', live_excel: 'Excel อัปเดตอัตโนมัติ', backup_dir: 'โฟลเดอร์สำรอง', backup_dir2: 'โฟลเดอร์สำรองที่สอง' };
+    backup_on_exit: 'สำรองตอนปิดโปรแกรม', backup_excel: 'สำรองเป็น Excel', live_excel: 'Excel อัปเดตอัตโนมัติ', archive_on: 'จัดเก็บไฟล์หนังสือ', archive_dir: 'โฟลเดอร์เก็บหนังสือ', backup_dir: 'โฟลเดอร์สำรอง', backup_dir2: 'โฟลเดอร์สำรองที่สอง' };
   const FLD = { book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', receiver_name: 'ผู้รับ', receiver_at: 'วันเวลารับ', sender_name: 'ผู้ส่ง', sender_at: 'วันเวลาส่ง' };
   const KN = k => k === 'out' ? 'ทะเบียนส่ง' : 'ทะเบียนรับ';
   const RULES = [
@@ -107,7 +107,7 @@ function createApp() {
   const publicSettings = () => { const s = db.getSettings(); delete s.password_hash; return s; };
   // บันทึก/แก้ไข/ยกเลิก/กู้คืน/เปลี่ยนตั้งค่า สำเร็จ -> อัปเดตไฟล์ Excel อัตโนมัติ
   app.use('/api', (req, res, next) => {
-    if (req.method !== 'GET' && /^\/(books|backup\/restore|settings)/.test(req.path)) res.on('finish', () => { if (res.statusCode < 300) live.schedule(); });
+    if (req.method !== 'GET' && /^\/(books|attachments|backup\/restore|settings)/.test(req.path)) res.on('finish', () => { if (res.statusCode < 300) live.schedule(); });
     next();
   });
   app.get('/api/state', wrap((req, res) => {
@@ -151,6 +151,12 @@ function createApp() {
     if (b.backup_keep !== undefined) { const n = parseInt(b.backup_keep, 10); if (!(n >= 3 && n <= 365)) throw new U.HttpError(400, 'จำนวนชุดที่เก็บต้องอยู่ระหว่าง 3-365'); out.backup_keep = String(n); }
     if (b.backup_excel !== undefined) out.backup_excel = b.backup_excel ? '1' : '0';
     if (b.live_excel !== undefined) out.live_excel = b.live_excel ? '1' : '0';
+    if (b.archive_on !== undefined) out.archive_on = b.archive_on ? '1' : '0';
+    if (b.archive_dir !== undefined) {
+      const v = String(b.archive_dir).trim();
+      if (v) { try { fs.mkdirSync(v, { recursive: true }); fs.accessSync(v, fs.constants.W_OK); } catch { throw new U.HttpError(400, 'เขียนไฟล์ในโฟลเดอร์นี้ไม่ได้ ตรวจสอบตำแหน่ง/ไดรฟ์อีกครั้ง'); } }
+      out.archive_dir = v;
+    }
     if (b.backup_on_exit !== undefined) out.backup_on_exit = b.backup_on_exit ? '1' : '0';
     if (b.backup_dir2 !== undefined) {
       const v = String(b.backup_dir2).trim();
@@ -266,11 +272,13 @@ function createApp() {
   app.post('/api/live-excel/update', wrap(async (req, res) => res.json(await live.write())));
   app.post('/api/live-excel/open', wrap(async (req, res) => {
     if (!isLocal(req)) throw new U.HttpError(403, 'เปิดไฟล์ได้เฉพาะที่เครื่องหลัก — ใช้ปุ่มดาวน์โหลดแทน');
-    let s = live.status(); if (!fs.existsSync(s.file)) s = await live.write();
-    if (!fs.existsSync(s.file)) throw new U.HttpError(400, s.error || 'ยังไม่มีไฟล์ Excel');
-    const folder = (req.body || {}).folder;
-    if (process.platform === 'win32') require('child_process').exec(folder ? `explorer /select,"${s.file}"` : `start "" "${s.file}"`);
-    res.json({ ok: true, file: s.file });
+    const q = req.body || {}; let s = live.status();
+    const file = q.kind === 'out' ? s.files_out : s.files_in;
+    if (!fs.existsSync(q.folder ? s.dir : file)) s = await live.write();
+    if (q.folder) { fs.mkdirSync(s.dir, { recursive: true }); if (process.platform === 'win32') require('child_process').exec(`explorer "${s.dir}"`); return res.json({ ok: true, dir: s.dir }); }
+    if (!fs.existsSync(file)) throw new U.HttpError(400, s.error || 'ยังไม่มีไฟล์ Excel');
+    if (process.platform === 'win32') require('child_process').exec(`start "" "${file}"`);
+    res.json({ ok: true, file });
   }));
   app.get('/api/export-all/xlsx', wrap(async (req, res) => {
     const d = new Date(); const stamp = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear() + 543}`;

@@ -5,16 +5,18 @@
 const fs = require('fs'), path = require('path');
 const db = require('./db'), backup = require('./backup'), exp = require('./export');
 
-const NAME = 'ทะเบียนหนังสือรับ-ส่ง (อัปเดตอัตโนมัติ).xlsx';
-const st = { at: '', path: '', copy2: '', error: '', warn2: '' };
+const archive = require('./archive');
+const NAMES = { in: 'ทะเบียนหนังสือรับ.xlsx', out: 'ทะเบียนหนังสือส่ง.xlsx' };
+const NAME = NAMES.in;   // (คงไว้ให้โค้ดเดิม)
+const st = { at: '', dir: '', copy2: '', error: '', warn2: '', files: 0, copied: 0, archived: '' };
 let timer = null, retry = null, running = false, again = false;
 
 const enabled = () => db.getSettings().live_excel !== '0';
 const isLocked = e => ['EBUSY', 'EPERM', 'EACCES'].includes(e && e.code);
 
-function put(dir, buf) {
+function put(dir, name, buf) {
   fs.mkdirSync(dir, { recursive: true });
-  const f = path.join(dir, NAME), t = f + '.tmp';
+  const f = path.join(dir, name), t = f + '.tmp';
   fs.writeFileSync(t, buf);
   try { fs.renameSync(t, f); } catch (e) { fs.rmSync(t, { force: true }); throw e; }
   return f;
@@ -24,25 +26,40 @@ async function write() {
   if (running) { again = true; return status(); }
   running = true;
   try {
-    if (!enabled()) return status();
-    const buf = await exp.makeXlsxAll('ข้อมูลทั้งหมด · อัปเดตอัตโนมัติทุกครั้งที่บันทึก');
-    try { st.path = put(backup.backupDir(), buf); st.at = new Date().toISOString(); st.error = ''; clearTimeout(retry); }
-    catch (e) {
-      st.error = isLocked(e) ? 'ไฟล์ Excel เปิดค้างอยู่ในโปรแกรม Excel จึงอัปเดตไม่ได้ — ปิดไฟล์ Excel แล้วระบบจะอัปเดตให้เองภายใน 1 นาที' : 'เขียนไฟล์ Excel ไม่สำเร็จ: ' + (e.code || e.message);
-      clearTimeout(retry); retry = setTimeout(() => { write().catch(() => {}); }, 60 * 1000); if (retry.unref) retry.unref();
+    if (!enabled() && !archive.enabled()) return status();
+    const dir = archive.archiveDir(); st.dir = dir; const errs = [];
+    // 1) จัดไฟล์หนังสือลงโฟลเดอร์ หนังสือรับ/หนังสือส่ง แยกตามวัน
+    let links = null;
+    if (archive.enabled()) {
+      try { const r = archive.sync(); links = r.links; st.files = r.files; st.copied = r.copied; st.archived = new Date().toISOString(); if (r.failed) errs.push(`คัดลอกไฟล์หนังสือไม่สำเร็จ ${r.failed} ไฟล์`); }
+      catch (e) { errs.push('จัดไฟล์หนังสือไม่สำเร็จ: ' + (e.code || e.message)); }
     }
-    const d2 = backup.backupDir2(); st.copy2 = ''; st.warn2 = '';
-    if (d2) { try { st.copy2 = put(d2, buf); } catch (e) { st.warn2 = `คัดลอกไปที่ ${d2} ไม่สำเร็จ (${e.code || e.message})`; } }
+    // 2) Excel ทะเบียนรับ / ทะเบียนส่ง (ไฟล์ละทะเบียน)
+    if (enabled()) {
+      const d2 = backup.backupDir2(); st.copy2 = ''; st.warn2 = '';
+      for (const kind of ['in', 'out']) {
+        const buf = await exp.makeXlsxKind(kind, 'ข้อมูลทั้งหมด · อัปเดตอัตโนมัติทุกครั้งที่บันทึก', links);
+        try { put(dir, NAMES[kind], buf); }
+        catch (e) { errs.push(isLocked(e) ? `ไฟล์ ${NAMES[kind]} เปิดค้างอยู่ในโปรแกรม Excel จึงอัปเดตไม่ได้ — ปิดไฟล์แล้วระบบจะอัปเดตให้เองภายใน 1 นาที` : `เขียน ${NAMES[kind]} ไม่สำเร็จ: ${e.code || e.message}`); }
+        if (d2) { try { put(d2, NAMES[kind], buf); st.copy2 = d2; } catch (e) { st.warn2 = `คัดลอกไปที่ ${d2} ไม่สำเร็จ (${e.code || e.message})`; } }
+      }
+    }
+    st.error = errs.join(' · ');
+    if (!st.error) { st.at = new Date().toISOString(); clearTimeout(retry); }
+    else { clearTimeout(retry); retry = setTimeout(() => { write().catch(() => {}); }, 60 * 1000); if (retry.unref) retry.unref(); }
   } catch (e) { st.error = e.message; }
   finally { running = false; if (again) { again = false; schedule(200); } }
   return status();
 }
 
 function schedule(ms = 1500) {
-  if (!enabled()) return;
+  if (!enabled() && !archive.enabled()) return;
   clearTimeout(timer); timer = setTimeout(() => { write().catch(() => {}); }, ms); if (timer.unref) timer.unref();
 }
 
-function status() { return { ...st, enabled: enabled(), name: NAME, dir: backup.backupDir(), file: path.join(backup.backupDir(), NAME) }; }
+function status() {
+  const dir = archive.archiveDir();
+  return { ...st, enabled: enabled(), archive: archive.enabled(), dir, names: NAMES, file: path.join(dir, NAMES.in), files_in: path.join(dir, NAMES.in), files_out: path.join(dir, NAMES.out), default_dir: archive.defaultDir() };
+}
 
-module.exports = { NAME, schedule, write, status };
+module.exports = { NAME, NAMES, schedule, write, status };

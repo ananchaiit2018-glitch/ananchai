@@ -114,18 +114,20 @@ function downloadAllXlsx() {
 }
 async function liveExcelCard(el) {
   const s = await api('/api/live-excel').catch(() => null); if (!s || !el.isConnected) return;
-  const local = S.st.is_local;
-  el.innerHTML = `<div class="xlhead"><div class="xlicon">${ic('sheet')}</div><div class="grow"><h2 style="margin:0">ไฟล์ Excel อัปเดตอัตโนมัติ</h2>
-      <div class="muted" style="font-size:.92rem">${s.enabled ? 'บันทึกรายการเมื่อไร ไฟล์ Excel จะเพิ่มรายการต่อท้ายให้ทันที (ทะเบียนรับ + ทะเบียนส่ง คนละแผ่นงาน)' : 'ปิดอยู่ — เปิดได้ที่หน้า "สำรองข้อมูล"'}</div></div>
-      ${s.enabled ? `<span class="xlstate ${s.error ? 'bad' : 'good'}">${s.error ? '⚠️ ยังไม่อัปเดต' : s.at ? '✅ อัปเดตแล้ว ' + fmtStamp(s.at) : '⏳ กำลังเตรียมไฟล์'}</span>` : ''}</div>
+  const local = S.st.is_local, on = s.enabled || s.archive;
+  el.innerHTML = `<div class="xlhead"><div class="xlicon">${ic('folder')}</div><div class="grow"><h2 style="margin:0">โฟลเดอร์เก็บหนังสือ</h2>
+      <div class="muted" style="font-size:.92rem">${on ? 'บันทึกเมื่อไร โปรแกรมจัดให้เอง: Excel ทะเบียนรับ/ส่ง + ไฟล์หนังสือแยกโฟลเดอร์ตามวัน' : 'ปิดอยู่ — เปิดได้ที่หน้า "สำรองข้อมูล"'}</div></div>
+      ${on ? `<span class="xlstate ${s.error ? 'bad' : 'good'}">${s.error ? '⚠️ ยังไม่อัปเดต' : s.at ? '✅ อัปเดตแล้ว ' + fmtStamp(s.at) : '⏳ กำลังเตรียม'}</span>` : ''}</div>
     ${s.error ? `<div class="notice warn" style="margin-top:10px">${esc(s.error)}</div>` : ''}${s.warn2 ? `<div class="notice warn" style="margin-top:10px">${esc(s.warn2)}</div>` : ''}
-    ${s.enabled ? `<div class="muted xlpath">📄 ${esc(s.file)}${s.copy2 ? '<br>📄 สำเนา: ' + esc(s.copy2) : ''}</div>` : ''}
-    <div class="row" style="margin-top:10px">${local && s.enabled ? `<button class="btn primary" id="xlopen">${ic('sheet')} เปิดไฟล์ Excel</button><button class="btn" id="xlfolder">${ic('folder')} เปิดโฟลเดอร์</button>` : ''}
-      <button class="btn" id="xldl">${ic('download')} ส่งออก Excel (รับ+ส่ง ทั้งหมด)</button>${s.enabled ? `<button class="btn" id="xlnow">${ic('refresh')} อัปเดตตอนนี้</button>` : ''}</div>`;
-  const open = folder => async () => { try { await api('/api/live-excel/open', { json: { folder } }); toast(folder ? 'เปิดโฟลเดอร์แล้ว' : 'กำลังเปิดไฟล์ใน Excel… (ถ้าเปิดค้างไว้ ระบบจะอัปเดตไม่ได้จนกว่าจะปิด)', 'ok', 6000); } catch (e) { toast(e.message, 'err', 7000); } };
-  if ($('#xlopen', el)) { $('#xlopen', el).onclick = open(false); $('#xlfolder', el).onclick = open(true); }
+    ${on ? `<div class="muted xlpath">📁 ${esc(s.dir)}${s.archive && s.files ? ` · ไฟล์หนังสือ ${s.files} ไฟล์` : ''}</div>` : ''}
+    <div class="row" style="margin-top:10px">${local && on ? `<button class="btn primary" id="xlfolder">${ic('folder')} เปิดโฟลเดอร์</button>` : ''}
+      ${local && s.enabled ? `<button class="btn" data-xk="in">${ic('sheet')} Excel ทะเบียนรับ</button><button class="btn" data-xk="out">${ic('sheet')} Excel ทะเบียนส่ง</button>` : ''}
+      <button class="btn" id="xldl">${ic('download')} โหลด Excel (รับ+ส่ง)</button>${on ? `<button class="btn" id="xlnow">${ic('refresh')} อัปเดตตอนนี้</button>` : ''}</div>`;
+  const open = body => async () => { try { await api('/api/live-excel/open', { json: body }); toast(body.folder ? 'เปิดโฟลเดอร์แล้ว' : 'กำลังเปิดใน Excel… (ระหว่างเปิดค้างไว้ ระบบจะอัปเดตไฟล์นี้ไม่ได้จนกว่าจะปิด)', 'ok', 6000); } catch (e) { toast(e.message, 'err', 7000); } };
+  if ($('#xlfolder', el)) $('#xlfolder', el).onclick = open({ folder: true });
+  $$('[data-xk]', el).forEach(b => b.onclick = open({ kind: b.dataset.xk }));
   $('#xldl', el).onclick = downloadAllXlsx;
-  if ($('#xlnow', el)) $('#xlnow', el).onclick = async () => { const r = await api('/api/live-excel/update', { method: 'POST' }).catch(e => ({ error: e.message })); toast(r.error || 'อัปเดตไฟล์ Excel แล้ว', r.error ? 'err' : 'ok'); liveExcelCard(el); };
+  if ($('#xlnow', el)) $('#xlnow', el).onclick = async () => { const r = await api('/api/live-excel/update', { method: 'POST' }).catch(e => ({ error: e.message })); toast(r.error || 'อัปเดตโฟลเดอร์เก็บหนังสือแล้ว', r.error ? 'err' : 'ok'); liveExcelCard(el); };
 }
 
 /* ---------- ช่องเลือกจากรายการ (+ พิมพ์เอง) ---------- */
@@ -698,16 +700,37 @@ function pickFolder(start) {
 
 /* ---------- สำรองข้อมูล ---------- */
 async function viewBackup() {
-  const m = shell('backup'); const b = await api('/api/backup'); const s = S.st.settings;
+  const m = shell('backup'); const [b, lx] = await Promise.all([api('/api/backup'), api('/api/live-excel')]); const s = S.st.settings;
+  const n = new Date(), dayEx = `${p2(n.getDate())}${p2(n.getMonth() + 1)}${String(n.getFullYear() + 543).slice(-2)}`;
   const logRows = b.log.map(l => `<div class="notice ${l.ok ? 'ok' : 'err'}">${fmtStamp(l.at)} — ${l.ok ? 'สำรองสำเร็จ: ' + esc(l.name) + ' (' + fmtSize(l.size) + ')' + (l.copy2 ? ' · คัดลอกไป ' + esc(l.copy2) : '') + (l.excel ? ' · Excel: ' + esc(l.excel) : '') + (l.warn ? '<br><b>คำเตือน:</b> ' + esc(l.warn) : '') : 'สำรองไม่สำเร็จ: ' + esc(l.error)}</div>`).join('');
   m.innerHTML = header('สำรองและกู้คืนข้อมูล') + `
+  <div class="card"><h2>${ic('folder')} โฟลเดอร์เก็บหนังสือ</h2>
+    <p class="muted" style="margin-top:-4px">บันทึกหนังสือเมื่อไร โปรแกรมจัดไฟล์ลงโฟลเดอร์นี้ให้เอง ไม่ต้องทำอะไรเพิ่ม (ไฟล์ต้นฉบับยังเก็บในโปรแกรมด้วย)</p>
+    <div class="arcgrid"><pre class="tree">📁 <b>${esc(lx.dir)}</b>
+ ├─ 📊 ทะเบียนหนังสือรับ.xlsx   <i>อัปเดตทุกครั้งที่บันทึก</i>
+ ├─ 📊 ทะเบียนหนังสือส่ง.xlsx
+ ├─ 📁 หนังสือรับ
+ │   └─ 📁 ${dayEx}          <i>← วันที่ลงทะเบียน (วว ดด ปป)</i>
+ │       ├─ 📄 01.pdf      <i>← หนังสือลำดับที่ 1 ของวัน</i>
+ │       ├─ 📄 02-1.jpg    <i>← หนังสือเดียวกันหลายไฟล์</i>
+ │       └─ 📄 02-2.jpg
+ └─ 📁 หนังสือส่ง
+     └─ 📁 ${dayEx}
+         └─ 📄 01.pdf</pre>
+    <div>
+      <div class="field"><label class="f">ตำแหน่งโฟลเดอร์ <small>(ว่าง = ${esc(lx.default_dir)})</small></label>
+        <div class="row"><input type="text" id="adir" class="grow" value="${esc(s.archive_dir)}" placeholder="${esc(lx.default_dir)}"><button class="btn" id="adirpick">${ic('folder')} เลือก…</button></div></div>
+      <label class="chk"><input type="checkbox" id="arcOn" ${s.archive_on !== '0' ? 'checked' : ''}> เก็บไฟล์หนังสือแยกโฟลเดอร์ หนังสือรับ / หนังสือส่ง ตามวัน</label>
+      <label class="chk"><input type="checkbox" id="livexl" ${s.live_excel !== '0' ? 'checked' : ''}> Excel ทะเบียนรับ / ทะเบียนส่ง (2 ไฟล์ อัปเดตทุกครั้ง มีลิงก์กดเปิดไฟล์หนังสือได้)</label>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="arcSave">${ic('save')} บันทึก</button><button class="btn" id="arcNow">${ic('refresh')} จัดเก็บตอนนี้</button>${S.st.is_local ? `<button class="btn" id="arcOpen">${ic('folder')} เปิดโฟลเดอร์</button>` : ''}</div>
+      <div class="muted" style="margin-top:8px;font-size:.9rem">${lx.error ? `<span style="color:var(--warn)">⚠️ ${esc(lx.error)}</span>` : lx.at ? `✅ จัดเก็บล่าสุด ${fmtStamp(lx.at)}${lx.archive ? ` · ไฟล์หนังสือ ${lx.files} ไฟล์` : ''}` : 'ยังไม่ได้จัดเก็บ'}</div>
+    </div></div></div>
   <div class="card"><h2>สำรองข้อมูล</h2><p>ไฟล์สำรองเป็น .zip เดียว รวมฐานข้อมูล ไฟล์แนบ ลายเซ็น ฟอนต์ และโลโก้</p>
     <div class="row"><button class="btn primary big" id="run">💾 สำรองข้อมูลตอนนี้</button></div>
     <div class="card" style="background:var(--bg2);margin:14px 0 0;box-shadow:none"><h2>ตั้งค่าสำรองอัตโนมัติ</h2>
       <div class="row"><label><input type="checkbox" id="auto" ${s.auto_backup === '1' ? 'checked' : ''}> เปิดสำรองอัตโนมัติ</label>
         <span>ทุก</span><select id="every" style="width:150px">${[[1, '1 ชั่วโมง'], [3, '3 ชั่วโมง'], [6, '6 ชั่วโมง'], [12, '12 ชั่วโมง'], [24, '1 วัน'], [72, '3 วัน'], [168, '7 วัน']].map(([v, t]) => `<option value="${v}" ${String(v) === s.backup_every_hours ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <span>เก็บไว้</span><input type="number" id="keep" min="3" max="365" value="${esc(s.backup_keep)}" style="width:90px"><span>ชุดล่าสุด</span></div>
-      <div class="row" style="margin-top:8px"><label><input type="checkbox" id="livexl" ${s.live_excel !== '0' ? 'checked' : ''}> <b>ไฟล์ Excel อัปเดตอัตโนมัติ</b> ทุกครั้งที่บันทึก/แก้ไข/ยกเลิกรายการ (ไฟล์เดียว เพิ่มรายการต่อท้ายเรื่อยๆ เก็บในโฟลเดอร์สำรอง + โฟลเดอร์ที่สอง)</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="xl" ${s.backup_excel === '1' ? 'checked' : ''}> สำรองเป็นไฟล์ <b>Excel (.xlsx)</b> ด้วย (ทะเบียนรับ+ส่ง ทุกรายการ) เปิดดู/แก้ไขได้โดยไม่ต้องใช้โปรแกรมนี้</label></div>
       <div class="row" style="margin-top:8px"><label><input type="checkbox" id="onexit" ${s.backup_on_exit === '1' ? 'checked' : ''}> สำรองให้อัตโนมัติทุกครั้งที่กด "ปิดโปรแกรม"</label></div>
       <div class="field" style="margin-top:10px"><label class="f">สำรองซ้ำไปอีกที่ <small>(เช่น แฟลชไดรฟ์ E:\\Backup — แนะนำมาก เพราะถ้าดิสก์เสีย ไฟล์สำรองในเครื่องเดียวกันหายด้วย)</small></label>
@@ -722,10 +745,15 @@ async function viewBackup() {
   <div class="card"><h2>กู้คืนจากไฟล์ที่เลือก</h2><div class="notice warn">การกู้คืนจะ <b>แทนที่ข้อมูลทั้งหมดในปัจจุบัน</b> ด้วยข้อมูลในไฟล์สำรอง (ระบบจะสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติก่อนเสมอ ชื่อไฟล์ขึ้นต้น before-restore)</div>
     <div class="row"><input type="file" id="rfile" accept=".zip"><button class="btn danger" id="rbtn">กู้คืนจากไฟล์นี้</button></div></div>`;
   $('#run').onclick = async e => { e.target.disabled = true; const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message })); toast(r.ok ? 'สำรองข้อมูลสำเร็จ: ' + r.name + (r.excel ? ' + Excel' : '') + (r.warn ? ' — คำเตือน: ' + r.warn : r.copy2 ? ' (และคัดลอกไป ' + r.copy2 + ' แล้ว)' : '') : 'สำรองข้อมูลไม่สำเร็จ: ' + r.error, r.ok && !r.warn ? 'ok' : 'err', 10000); viewBackup(); };
+  const arcSave = async () => { try { await api('/api/settings', { method: 'PUT', json: { archive_dir: $('#adir').value, archive_on: $('#arcOn').checked, live_excel: $('#livexl').checked } }); await api('/api/live-excel/update', { method: 'POST' }); toast('บันทึกแล้ว และจัดเก็บไฟล์ลงโฟลเดอร์ให้แล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };
+  $('#arcSave').onclick = arcSave;
+  $('#adirpick').onclick = async () => { const p = await pickFolder($('#adir').value || lx.dir); if (p) { $('#adir').value = p; arcSave(); } };
+  $('#arcNow').onclick = async () => { const r = await api('/api/live-excel/update', { method: 'POST' }).catch(e => ({ error: e.message })); toast(r.error || `จัดเก็บแล้ว (ไฟล์หนังสือ ${r.files || 0} ไฟล์)`, r.error ? 'err' : 'ok', 7000); viewBackup(); };
+  if ($('#arcOpen')) $('#arcOpen').onclick = async () => { try { await api('/api/live-excel/open', { json: { folder: true } }); toast('เปิดโฟลเดอร์แล้ว', 'ok'); } catch (e) { toast(e.message, 'err'); } };
   $('#bdirpick').onclick = async () => { const p = await pickFolder($('#bdir').value); if (p) { $('#bdir').value = p; $('#bdirsave').click(); } };
   $('#bdir2pick').onclick = async () => { const p = await pickFolder($('#bdir2').value); if (p) { $('#bdir2').value = p; $('#autosave').click(); } };
   $('#autosave').onclick = async () => {
-    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, live_excel: $('#livexl').checked, backup_dir2: $('#bdir2').value } });
+    try { await api('/api/settings', { method: 'PUT', json: { auto_backup: $('#auto').checked, backup_every_hours: $('#every').value, backup_keep: $('#keep').value, backup_on_exit: $('#onexit').checked, backup_excel: $('#xl').checked, backup_dir2: $('#bdir2').value } });
       toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }
   };
   $('#bdirsave').onclick = async () => { try { await api('/api/settings', { method: 'PUT', json: { backup_dir: $('#bdir').value } }); toast('บันทึกตำแหน่งสำรองข้อมูลแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };

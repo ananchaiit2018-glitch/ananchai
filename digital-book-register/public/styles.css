@@ -341,3 +341,11 @@ td.nowrap{white-space:nowrap}
 .ocr-text{margin-top:6px;min-height:140px;font-size:.9rem !important;font-weight:400 !important;color:var(--text) !important}
 .field.ocr-hit input,.field.ocr-hit select,.field.ocr-hit textarea,.field.ocr-hit .cal-btn{border-color:#E8A400 !important;box-shadow:0 0 0 4px color-mix(in srgb,#F5B301 25%,transparent) !important;background:color-mix(in srgb,#F5B301 7%,var(--input)) !important}
 @media (max-width:640px){.ocr-drop{flex-wrap:wrap}}
+
+/* ---- โฟลเดอร์เก็บหนังสือ ---- */
+.arcgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.tree{margin:0;padding:14px 16px;border-radius:14px;background:var(--sig-bg);border:1px solid var(--line);font:inherit;font-size:.92rem;line-height:1.7;white-space:pre;overflow:auto;color:var(--text)}
+.tree i{font-style:normal;color:var(--muted);font-size:.85em}
+label.chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+label.chk input{margin-top:.3em}
+@media (max-width:980px){.arcgrid{grid-template-columns:1fr}}

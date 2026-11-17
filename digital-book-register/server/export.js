@@ -1,4 +1,5 @@
 'use strict';
+const path = require('path');
 const ExcelJS = require('exceljs');
 const books = require('./books');
 const db = require('./db');
@@ -55,10 +56,10 @@ function newBook(useColor) {
   return { wb, s, fam, color };
 }
 
-function addSheet(wb, kind, rows, line, fam, color, s) {
+function addSheet(wb, kind, rows, line, fam, color, s, links) {
   const ws = wb.addWorksheet(titleOf(kind), { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  const hdr = HEADERS[kind];
-  const widths = [14, 18, 14, 26, 26, 46, 18, 20, 20, 18, 16];
+  const hdr = links ? [...HEADERS[kind], 'ไฟล์หนังสือ'] : HEADERS[kind];
+  const widths = [14, 18, 14, 26, 26, 46, 18, 20, 20, 18, 16, 26];
   ws.columns = widths.map(w => ({ width: w }));
   const base = f => ({ ...(fam ? { name: fam } : {}), ...f });
   ws.mergeCells(1, 1, 1, hdr.length); ws.getCell('A1').value = titleOf(kind);
@@ -73,6 +74,7 @@ function addSheet(wb, kind, rows, line, fam, color, s) {
   const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
   rows.forEach((b, idx) => {
     const r = ws.getRow(5 + idx); toRow(b).forEach((v, i) => { r.getCell(i + 1).value = v; });
+    if (links) { const l = links[b.id] || []; if (l.length) r.getCell(hdr.length).value = { text: l.join('\n'), hyperlink: l[0].split(path.sep).join('/') }; else r.getCell(hdr.length).value = ''; }
     r.eachCell({ includeEmpty: true }, (c, n) => { c.font = base({ size: 14, color: { argb: color } }); c.alignment = { vertical: 'top', wrapText: true, horizontal: n === 1 || n === 3 ? 'center' : 'left' }; c.border = border; });
   });
   hr.eachCell(c => { c.border = border; });
@@ -89,6 +91,13 @@ async function makeXlsx(q) {
 }
 
 // ไฟล์ Excel สำหรับสำรองข้อมูล: ทะเบียนรับ + ทะเบียนส่ง ทุกรายการ (รวมที่ยกเลิก) คนละแผ่นงาน
+// ไฟล์ Excel แยกทะเบียน (สำหรับโฟลเดอร์เก็บหนังสือ) มีคอลัมน์ลิงก์ไปไฟล์หนังสือ
+async function makeXlsxKind(kind, line, links) {
+  const { wb, s, fam, color } = newBook(false);
+  addSheet(wb, kind, books.listForExport({ kind }), line, fam, color, s, links);
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
 async function makeXlsxAll(line = 'ทั้งหมด (ไฟล์สำรองข้อมูล)') {
   const { wb, s, fam, color } = newBook(false);
   for (const kind of ['in', 'out']) addSheet(wb, kind, books.listForExport({ kind }), line, fam, color, s);
@@ -107,4 +116,4 @@ function makeCsv(q) {
   return Buffer.from('﻿' + lines.join('\r\n') + '\r\n', 'utf8');   // BOM ให้ Excel อ่านภาษาไทยถูกต้อง
 }
 
-module.exports = { makePdf, makeXlsx, makeXlsxAll, makeCsv, titleOf, resolveScope };
+module.exports = { makePdf, makeXlsx, makeXlsxAll, makeXlsxKind, makeCsv, titleOf, resolveScope };
