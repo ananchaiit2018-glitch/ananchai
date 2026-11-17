@@ -46,7 +46,8 @@ function columnsFor(kind, withFrom) {
 
 function cellText(row, key) {
   if (key === 'book_date') return U.thaiDate(row.book_date);
-  if (key === 'subject' && row.status === 'cancelled') return `${row.subject}\n(ยกเลิก: ${row.cancel_reason})`;
+  // รายการที่ยกเลิก: ขีดฆ่าทั้งแถว (วาดตอนพิมพ์) และเขียน "ยกเลิก (เหตุผล)" ในช่องหมายเหตุ เหมือนแก้ในสมุดทะเบียน
+  if (key === 'remark' && row.status === 'cancelled') return [`ยกเลิก${row.cancel_reason ? ` (${row.cancel_reason})` : ''}`, row.remark].filter(Boolean).join('\n');
   return row[key] || '';
 }
 
@@ -187,7 +188,14 @@ function build(opts) {
     let x = M.left;
     cols.forEach((c, i) => {
       doc.font('Reg').fontSize(size).fillColor(dataColor);
-      cells[i].forEach((ln, j) => doc.text(ln, x + PAD, y + textOff + j * rowPitch, { width: c.w - PAD * 2, align: c.align || 'left', lineBreak: false }));
+      cells[i].forEach((ln, j) => {
+        const ty = y + textOff + j * rowPitch;
+        doc.text(ln, x + PAD, ty, { width: c.w - PAD * 2, align: c.align || 'left', lineBreak: false });
+        if (row.status === 'cancelled' && c.key !== 'remark' && ln.trim()) {   // เส้นขีดฆ่า
+          const tw = Math.min(doc.widthOfString(ln), c.w - PAD * 2), sx = c.align === 'center' ? x + (c.w - tw) / 2 : x + PAD, sy = ty + size * 0.62;
+          doc.save().lineWidth(0.8).strokeColor(dataColor).moveTo(sx - 1, sy).lineTo(sx + tw + 1, sy).stroke().restore();
+        }
+      });
       x += c.w;
     });
     for (let k = 1; k <= nLines; k++) dotted(y + k * rowPitch);

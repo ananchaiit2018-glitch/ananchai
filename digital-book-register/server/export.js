@@ -75,7 +75,7 @@ function addSheet(wb, kind, rows, line, fam, color, s, links) {
   rows.forEach((b, idx) => {
     const r = ws.getRow(5 + idx); toRow(b).forEach((v, i) => { r.getCell(i + 1).value = v; });
     if (links) { const l = links[b.id] || []; if (l.length) r.getCell(hdr.length).value = { text: l.join('\n'), hyperlink: l[0].split(path.sep).join('/') }; else r.getCell(hdr.length).value = ''; }
-    r.eachCell({ includeEmpty: true }, (c, n) => { c.font = base({ size: 14, color: { argb: color } }); c.alignment = { vertical: 'top', wrapText: true, horizontal: n === 1 || n === 3 ? 'center' : 'left' }; c.border = border; });
+    const x = b.status === 'cancelled'; r.eachCell({ includeEmpty: true }, (c, n) => { c.font = base({ size: 14, color: { argb: color }, strike: x && n < 11 }); c.alignment = { vertical: 'top', wrapText: true, horizontal: n === 1 || n === 3 ? 'center' : 'left' }; c.border = border; });
   });
   hr.eachCell(c => { c.border = border; });
   ws.views = [{ state: 'frozen', ySplit: 4 }];
