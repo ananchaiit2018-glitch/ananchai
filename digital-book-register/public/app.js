@@ -80,6 +80,7 @@ async function viewDashboard() {
       <a class="tile in" href="#/new/in"><span class="tile-ic">${ic('inbox')}</span><span class="grow"><b>เพิ่มหนังสือรับ</b><small>เลขทะเบียนรับถัดไป <span class="num">${esc(d.next_in)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
       <a class="tile out" href="#/new/out"><span class="tile-ic">${ic('send')}</span><span class="grow"><b>เพิ่มหนังสือส่ง</b><small>เลขทะเบียนส่งถัดไป <span class="num">${esc(d.next_out)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
     </div>
+    <div id="carry"></div>
     <div class="grid g4 stats">
       <div class="card stat"><span class="st-ic in">${ic('inbox')}</span><div><div class="l">หนังสือรับ ปีนี้</div><div class="n">${d.in_year}</div><small class="muted">ทั้งหมด ${d.in_total}</small></div></div>
       <div class="card stat"><span class="st-ic in">${ic('calendar')}</span><div><div class="l">หนังสือรับ เดือนนี้</div><div class="n">${d.in_month}</div></div></div>
@@ -97,6 +98,32 @@ async function viewDashboard() {
   const tick = () => { const c = $('#clock'); if (!c) return clearInterval(clk); const n = new Date(); c.textContent = `${p2(n.getHours())}:${p2(n.getMinutes())}`; $('#today').textContent = longToday(); };
   const clk = setInterval(tick, 15000); tick();
   liveExcelCard($('#xlcard'));
+  if (!d.in_year && !d.out_year) carryOverCard($('#carry'));
+}
+
+/* ---------- ต่อเลขจากสมุดทะเบียนเล่มเดิม (แสดงเมื่อปีนี้ยังไม่มีรายการ) ---------- */
+async function carryOverCard(el) {
+  let hide = false; try { hide = localStorage.getItem('carryDone-' + S.st.year) === '1'; } catch { /* ignore */ }
+  if (hide) return;
+  const cs = await api('/api/counters').catch(() => []); if (!el.isConnected) return;
+  const cur = k => { const c = cs.find(x => x.kind === k && x.year === S.st.year); return c ? c.next_no - 1 : 0; };
+  el.innerHTML = `<div class="card carry"><div class="xlhead"><div class="xlicon" style="color:var(--accent)">${ic('book')}</div><div class="grow">
+      <h2 style="margin:0">เคยลงในสมุดมาก่อนไหม? ต่อเลขจากสมุดได้เลย</h2>
+      <div class="muted" style="font-size:.92rem">ใส่เลขทะเบียน<b>ตัวสุดท้าย</b>ที่เขียนในสมุด ปี ${S.st.year} โปรแกรมจะเริ่มเลขถัดไปให้ (ถ้าเริ่มนับ 1 ใหม่ในคอม กด "ไม่ต้อง")</div></div></div>
+    <div class="row" style="margin-top:12px">
+      <label class="carry-f">ทะเบียนรับ ถึงเลข <input type="number" id="cIn" min="0" value="${cur('in') || ''}" placeholder="เช่น 50"></label>
+      <label class="carry-f">ทะเบียนส่ง ถึงเลข <input type="number" id="cOut" min="0" value="${cur('out') || ''}" placeholder="เช่น 43"></label>
+      <button class="btn primary" id="cGo">${ic('save')} ต่อเลขจากสมุด</button><span class="grow"></span><button class="btn sm" id="cNo">ไม่ต้อง เริ่มเลข 1</button></div></div>`;
+  const done = () => { try { localStorage.setItem('carryDone-' + S.st.year, '1'); } catch { /* ignore */ } };
+  $('#cNo', el).onclick = () => { done(); el.innerHTML = ''; };
+  $('#cGo', el).onclick = async () => {
+    const vals = { in: parseInt($('#cIn', el).value, 10), out: parseInt($('#cOut', el).value, 10) };
+    if (!(vals.in > 0) && !(vals.out > 0)) { toast('ใส่เลขตัวสุดท้ายในสมุดอย่างน้อย 1 ช่อง', 'err'); return; }
+    const msg = ['in', 'out'].filter(k => vals[k] > 0).map(k => `${k === 'in' ? 'ทะเบียนรับ' : 'ทะเบียนส่ง'} เริ่มที่เลข <b>${vals[k] + 1}</b>`).join('<br>');
+    if (!await confirmBox('ต่อเลขจากสมุดเดิม', `<p>${msg}</p><p class="muted">ปี ${S.st.year} · ตรวจเลขให้ถูกก่อนนะ (ตั้งแล้วลดเลขลงไม่ได้ ถ้ามีรายการบันทึกแล้ว)</p>`, 'ยืนยัน')) return;
+    try { for (const k of ['in', 'out']) if (vals[k] > 0) await api('/api/counters', { method: 'PUT', json: { kind: k, year: S.st.year, next_no: vals[k] + 1 } });
+      done(); toast('ตั้งเลขต่อจากสมุดแล้ว', 'ok'); route(); } catch (e) { toast(e.message, 'err', 8000); }
+  };
 }
 
 /* ---------- การ์ดไฟล์ Excel อัปเดตอัตโนมัติ ---------- */
