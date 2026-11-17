@@ -11,8 +11,9 @@ const TEXT_FIELDS = ['book_no', 'from_org', 'to_org', 'subject', 'action', 'rema
 const FIELD_LABELS = {
   book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ',
   remark: 'หมายเหตุ', sender_name: 'ผู้ส่ง', receiver_name: 'ผู้รับ', sender_at: 'วันเวลาส่ง', receiver_at: 'วันเวลารับ',
-  sender_sig: 'ลายเซ็นผู้ส่ง', receiver_sig: 'ลายเซ็นผู้รับ',
+  sender_sig: 'ลายเซ็นผู้ส่ง', receiver_sig: 'ลายเซ็นผู้รับ', urgency: 'ชั้นความเร็ว', due_date: 'ต้องดำเนินการภายใน',
 };
+const URGENCY = ['', 'ด่วน', 'ด่วนมาก', 'ด่วนที่สุด'];
 const MAX_LEN = { subject: 1000, remark: 1000, default: 300 };
 
 /* ---------- ปีทะเบียน / เลขทะเบียน ---------- */
@@ -105,6 +106,12 @@ function clean(input, { partial = false } = {}) {
     if (v && !U.isLocalDateTime(v)) throw new U.HttpError(400, `${FIELD_LABELS[f]} ไม่ถูกต้อง`);
     o[f] = v;
   }
+  if (input.urgency !== undefined || !partial) {
+    const v = String(input.urgency || ''); if (!URGENCY.includes(v)) throw new U.HttpError(400, 'ชั้นความเร็วไม่ถูกต้อง'); o.urgency = v;
+  }
+  if (input.due_date !== undefined || !partial) {
+    const v = String(input.due_date || ''); if (v && !U.isISODate(v)) throw new U.HttpError(400, 'วันที่ "ต้องดำเนินการภายใน" ไม่ถูกต้อง'); o.due_date = v;
+  }
   if (o.subject !== undefined && !o.subject) throw new U.HttpError(400, 'กรุณากรอก "เรื่อง"');
   if (!partial && !o.subject) throw new U.HttpError(400, 'กรุณากรอก "เรื่อง"');
   return o;
@@ -142,10 +149,10 @@ function create(kind, input) {
       const no = allocate(d, kind, year, s);
       const now = new Date().toISOString();
       const r = d.prepare(`INSERT INTO books (kind,year,reg_no,reg_label,reg_date,book_no,book_date,from_org,to_org,subject,action,remark,
-        sender_name,receiver_name,sender_at,receiver_at,client_token,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        sender_name,receiver_name,sender_at,receiver_at,client_token,created_at,updated_at,urgency,due_date)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         kind, year, no, label(no, year, s), U.todayISO(), data.book_no, data.book_date, data.from_org, data.to_org, data.subject, data.action,
-        data.remark, data.sender_name, data.receiver_name, data.sender_at, data.receiver_at, token, now, now);
+        data.remark, data.sender_name, data.receiver_name, data.sender_at, data.receiver_at, token, now, now, data.urgency, data.due_date);
       const id = Number(r.lastInsertRowid);
       for (const [who, key] of [['sender', 'sender_sig_data'], ['receiver', 'receiver_sig_data']]) {
         if (input[key]) {
@@ -260,7 +267,7 @@ function list(p) {
   const limit = Math.min(Math.max(parseInt(p.limit, 10) || 50, 1), 500);
   const page = Math.max(parseInt(p.page, 10) || 1, 1);
   const total = d.prepare(`SELECT COUNT(*) c FROM books ${where}`).get(...args).c;
-  const rows = d.prepare(`SELECT id,kind,year,reg_no,reg_label,reg_date,book_no,book_date,from_org,to_org,subject,action,remark,sender_name,receiver_name,status,
+  const rows = d.prepare(`SELECT id,kind,year,reg_no,reg_label,reg_date,book_no,book_date,from_org,to_org,subject,action,remark,sender_name,receiver_name,status,urgency,due_date,done_at,
       (sender_sig!='') has_sender_sig,(receiver_sig!='') has_receiver_sig,
       (SELECT COUNT(*) FROM attachments a WHERE a.book_id=books.id AND a.removed_at='') att_count
     FROM books ${where} ${orderBy(p.sort, p.dir)} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
@@ -343,6 +350,29 @@ function signaturePath(id, who) {
   return path.join(cfg.DIRS.signatures, f);
 }
 
+/* ---------- เตือนความจำ: หนังสือที่มีกำหนด "ภายในวันที่" และยังไม่เสร็จ ---------- */
+function tasks() {
+  return db.get().prepare(`SELECT id, kind, reg_label, book_no, book_date, subject, from_org, to_org, urgency, due_date, reg_date
+    FROM books WHERE status='active' AND due_date<>'' AND done_at='' ORDER BY due_date ASC, id ASC`).all();
+}
+function setDone(id, done, note = '') {
+  db.tx(d => {
+    const cur = d.prepare('SELECT * FROM books WHERE id=?').get(id);
+    if (!cur) throw new U.HttpError(404, 'ไม่พบรายการ');
+    if (cur.status === 'cancelled') throw new U.HttpError(409, 'รายการที่ยกเลิกแล้ว');
+    if (done) {
+      if (cur.done_at) return;
+      d.prepare('UPDATE books SET done_at=?, done_by=?, done_note=?, updated_at=? WHERE id=?').run(new Date().toISOString(), ctx.getStore() || '', String(note || '').slice(0, 300), new Date().toISOString(), id);
+      logHistory(d, id, 'done', { note: String(note || '') });
+    } else {
+      if (!cur.done_at) return;
+      d.prepare("UPDATE books SET done_at='', done_by='', done_note='', updated_at=? WHERE id=?").run(new Date().toISOString(), id);
+      logHistory(d, id, 'undone', {});
+    }
+  });
+  return get(id);
+}
+
 // หารายการที่อาจลงซ้ำ (เฉพาะที่ยังใช้งาน ในทะเบียนเดียวกัน): ช่อง "ที่" ตรงกัน (ไม่สนช่องว่าง) หรือ เรื่อง+ลงวันที่ ตรงกัน
 function findDuplicates(kind, { book_no = '', subject = '', book_date = '' } = {}, exceptId = 0) {
   const ns = s => String(s || '').replace(/\s+/g, '');
@@ -352,5 +382,5 @@ function findDuplicates(kind, { book_no = '', subject = '', book_date = '' } = {
     .filter(b => (no && ns(b.book_no) === no) || (subj && book_date && b.book_date === book_date && ns(b.subject) === subj)).slice(0, 5);
 }
 
-module.exports = { findDuplicates, registrationYear, label, create, update, cancel, get, list, listForExport, dashboard, suggest, counters, setNext, peekNext, relabelAll,
+module.exports = { tasks, setDone, findDuplicates, registrationYear, label, create, update, cancel, get, list, listForExport, dashboard, suggest, counters, setNext, peekNext, relabelAll,
   addAttachment, getAttachment, removeAttachment, signaturePath, FIELD_LABELS };

@@ -8,7 +8,7 @@ const ACTIONS = {
   app_start: 'เปิดโปรแกรม', app_stop: 'ปิดโปรแกรม',
   login: 'เข้าระบบ', login_fail: 'ใส่รหัสผิด', logout: 'ออกจากระบบ',
   duty_start: 'เข้าเวร', duty_change: 'เปลี่ยนคนเข้าเวร',
-  book_create: 'ลงหนังสือใหม่', book_update: 'แก้หนังสือ', book_cancel: 'ยกเลิกหนังสือ',
+  book_create: 'ลงหนังสือใหม่', book_update: 'แก้หนังสือ', book_cancel: 'ยกเลิกหนังสือ', task_done: 'ทำเสร็จแล้ว', task_undone: 'เปลี่ยนเป็นยังไม่เสร็จ',
   attach_add: 'แนบไฟล์', attach_remove: 'ลบไฟล์แนบ',
   print: 'สั่งพิมพ์', export: 'โหลดไฟล์ออก',
   settings: 'แก้ตั้งค่า', counters: 'ตั้งเลขทะเบียนใหม่', password: 'เปลี่ยนรหัสผ่าน', font: 'เปลี่ยนฟอนต์', logo: 'เปลี่ยนโลโก้',
@@ -16,7 +16,7 @@ const ACTIONS = {
 };
 const GROUPS = {
   access: { label: 'เปิดโปรแกรม / เข้าเวร', actions: ['app_start', 'app_stop', 'login', 'login_fail', 'logout', 'duty_start', 'duty_change'] },
-  register: { label: 'ลงทะเบียนหนังสือ', actions: ['book_create', 'book_update', 'book_cancel', 'attach_add', 'attach_remove'] },
+  register: { label: 'ลงทะเบียนหนังสือ', actions: ['book_create', 'book_update', 'book_cancel', 'task_done', 'task_undone', 'attach_add', 'attach_remove'] },
   output: { label: 'พิมพ์ / โหลดไฟล์', actions: ['print', 'export'] },
   system: { label: 'ตั้งค่า / สำรองข้อมูล', actions: ['settings', 'counters', 'password', 'font', 'logo', 'backup', 'backup_auto', 'restore', 'reset'] },
 };

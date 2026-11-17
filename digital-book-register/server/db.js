@@ -79,6 +79,10 @@ function open(file = cfg.DB_FILE) {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 10000;');
   db.exec(SCHEMA);
   if (!db.prepare('PRAGMA table_info(history)').all().some(c => c.name === 'actor')) db.exec("ALTER TABLE history ADD COLUMN actor TEXT NOT NULL DEFAULT ''");
+  // ชั้นความเร็ว / กำหนดดำเนินการ / ทำเสร็จแล้ว (เพิ่มภายหลัง)
+  const bcols = db.prepare('PRAGMA table_info(books)').all().map(c => c.name);
+  for (const c of ['urgency', 'due_date', 'done_at', 'done_by', 'done_note']) if (!bcols.includes(c)) db.exec(`ALTER TABLE books ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_due ON books (due_date, done_at)");
   return db;
 }
 function close() { if (db) { try { db.close(); } catch { /* ignore */ } db = null; } }

@@ -63,7 +63,14 @@
       }
       if (!out.to_org && kw('เรียน').test(l)) out.to_org = clean(l.replace(kw('เรียน'), ''));
     }
-    for (const k of ['book_no', 'book_date', 'subject', 'to_org', 'from_org']) if (out[k]) out.found.push(k);
+    // ชั้นความเร็ว: ดูเฉพาะหัวหนังสือ (บรรทัดต้นๆ ที่ขึ้นต้นด้วยคำว่า ด่วน) กันคำว่า "โดยด่วน" ในเนื้อหา
+    out.urgency = '';
+    for (const l of lines.slice(0, 10)) { const t = l.replace(/\s+/g, ''); if (/^ด่วนที่สุด/.test(t)) { out.urgency = 'ด่วนที่สุด'; break; } if (/^ด่วนมาก/.test(t)) { out.urgency = 'ด่วนมาก'; break; } if (/^ด่วน$/.test(t)) { out.urgency = 'ด่วน'; break; } }
+    // กำหนด "ภายในวันที่ ..." ในเนื้อหา
+    out.due_date = '';
+    const all = lines.join(' '); const mm = all.match(new RegExp(loose('ภายใน') + '(?:\\s*' + loose('วันที่') + ')?\\s*(.{0,40})', 'u'));
+    if (mm) out.due_date = findDate(mm[1]);
+    for (const k of ['book_no', 'book_date', 'subject', 'to_org', 'from_org', 'urgency', 'due_date']) if (out[k]) out.found.push(k);
     return out;
   }
 

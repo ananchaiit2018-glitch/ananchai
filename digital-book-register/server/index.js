@@ -46,7 +46,7 @@ function createApp() {
     reg_format: 'รูปแบบเลขทะเบียน', reg_pad: 'จำนวนหลัก', start_in: 'เลขเริ่มต้นรับ', start_out: 'เลขเริ่มต้นส่ง', ui_font: 'ฟอนต์หน้าจอ', ui_scale: 'ขนาดตัวอักษร',
     print_font_size: 'ขนาดตัวอักษรพิมพ์', data_color: 'สีตัวอักษร', auto_backup: 'สำรองอัตโนมัติ', backup_every_hours: 'ความถี่สำรอง', backup_keep: 'จำนวนชุดสำรอง',
     backup_on_exit: 'สำรองตอนปิดโปรแกรม', backup_excel: 'สำรองเป็น Excel', live_excel: 'Excel อัปเดตอัตโนมัติ', archive_on: 'จัดเก็บไฟล์หนังสือ', archive_dir: 'โฟลเดอร์เก็บหนังสือ', backup_dir: 'โฟลเดอร์สำรอง', backup_dir2: 'โฟลเดอร์สำรองที่สอง' };
-  const FLD = { book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', receiver_name: 'ผู้รับ', receiver_at: 'วันเวลารับ', sender_name: 'ผู้ส่ง', sender_at: 'วันเวลาส่ง' };
+  const FLD = { urgency: 'ชั้นความเร็ว', due_date: 'กำหนดดำเนินการ', book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', receiver_name: 'ผู้รับ', receiver_at: 'วันเวลารับ', sender_name: 'ผู้ส่ง', sender_at: 'วันเวลาส่ง' };
   const KN = k => k === 'out' ? 'ทะเบียนส่ง' : 'ทะเบียนรับ';
   const RULES = [
     ['POST', /^\/api\/login$/, (q, b, st) => st < 300 ? ['login', 'ใส่รหัสผ่านเข้าโปรแกรม'] : st === 401 ? ['login_fail', 'ใส่รหัสผ่านผิด'] : null, true],
@@ -55,6 +55,8 @@ function createApp() {
     ['POST', /^\/api\/books\/(in|out)$/, (q, b) => b && !b.duplicate ? ['book_create', `${KN(b.kind)} ${b.reg_label} · ${b.subject}`, b.id] : null],
     ['PUT', /^\/api\/books\/id\/\d+$/, (q, b) => { if (!b) return null; const h = (b.history || [])[0]; const f = h && h.action === 'update' ? Object.keys(h.changes || {}).map(k => FLD[k] || k) : [];
       return ['book_update', `${KN(b.kind)} ${b.reg_label} · ${b.subject}${f.length ? ' · แก้ช่อง ' + f.join(', ') : ' · (กดบันทึกแต่ไม่ได้แก้อะไร)'}`, b.id]; }],
+    ['POST', /^\/api\/books\/id\/\d+\/done$/, (q, b) => b ? ['task_done', `${KN(b.kind)} ${b.reg_label} · ${b.subject}`, b.id] : null],
+    ['POST', /^\/api\/books\/id\/\d+\/undone$/, (q, b) => b ? ['task_undone', `${KN(b.kind)} ${b.reg_label} · ${b.subject}`, b.id] : null],
     ['POST', /^\/api\/books\/id\/\d+\/cancel$/, (q, b) => b ? ['book_cancel', `${KN(b.kind)} ${b.reg_label} · เพราะ ${(q.body || {}).reason || '-'}`, b.id] : null],
     ['POST', /^\/api\/books\/id\/(\d+)\/attachments$/, (q, b, st, m) => { let r = ''; try { r = books.get(+m[1]).reg_label; } catch { /* ignore */ } return ['attach_add', `${r} · ${(q.files || []).map(f => fixName(f.originalname)).join(', ')}`, +m[1]]; }],
     ['DELETE', /^\/api\/attachments\/(\d+)$/, (q, b, st, m) => ['attach_remove', `ลบไฟล์แนบ (รหัส ${m[1]})`]],
@@ -219,6 +221,10 @@ function createApp() {
   app.get('/api/dashboard', wrap((req, res) => res.json(books.dashboard())));
   app.get('/api/suggest', wrap((req, res) => res.json(books.suggest(req.query.field, req.query.q))));
   app.get('/api/books', wrap((req, res) => res.json(books.list(req.query))));
+  app.get('/api/tasks', wrap((req, res) => res.json(books.tasks())));
+  app.get('/api/stats', wrap((req, res) => res.json(require('./stats').forYear(req.query.year))));
+  app.post('/api/books/id/:id/done', wrap((req, res) => res.json(books.setDone(+req.params.id, true, (req.body || {}).note))));
+  app.post('/api/books/id/:id/undone', wrap((req, res) => res.json(books.setDone(+req.params.id, false))));
   app.post('/api/books/dupcheck/:kind', wrap((req, res) => res.json(books.findDuplicates(req.params.kind, req.body || {}, +(req.body || {}).except || 0))));
   app.post('/api/books/:kind', wrap((req, res) => res.status(201).json(books.create(req.params.kind, req.body || {}))));
   app.get('/api/books/id/:id', wrap((req, res) => res.json(books.get(+req.params.id))));

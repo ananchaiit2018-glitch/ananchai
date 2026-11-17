@@ -4,7 +4,7 @@ const S = { st: null };          // สถานะที่โหลดจา�
 const KIND = { in: 'หนังสือรับ', out: 'หนังสือส่ง' };
 const MENU = [
   ['dashboard', 'home', 'หน้าหลัก'],   // ปุ่มเพิ่มหนังสือรับ/ส่ง อยู่ที่หน้าหลัก (ปุ่มใหญ่) และหน้าทะเบียน (＋ เพิ่ม) แล้ว
-  ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['reports', 'printer', 'พิมพ์และส่งออก'],
+  ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['stats', 'chart', 'สถิติรายเดือน'], ['reports', 'printer', 'พิมพ์และส่งออก'],
   ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'], ['activity', 'log', 'ประวัติการใช้งาน'],
 ];
 // ฟอนต์หน้าจอ (ฝังในโปรแกรม ใช้ออฟไลน์ได้) — การพิมพ์/PDF ยังใช้ TH Sarabun เสมอ
@@ -21,6 +21,22 @@ function applyUiFont(id, scale) {
   r.setProperty('--font', `${f.css},'Leelawadee UI','Tahoma',sans-serif`);
   r.setProperty('--fs', (f.base * (parseInt(scale, 10) || 100) / 100).toFixed(2) + 'px');
   document.documentElement.dataset.uifont = f.id;
+}
+// ชั้นความเร็ว / กำหนดดำเนินการ
+const URG = ['ด่วน', 'ด่วนมาก', 'ด่วนที่สุด'];
+const urgTag = u => u ? `<span class="urg u${URG.indexOf(u) + 1}">${esc(u)}</span> ` : '';
+function dueInfo(due) {
+  const n = Math.round((new Date(due + 'T00:00') - new Date(todayISO() + 'T00:00')) / 86400000);
+  if (n < 0) return { n, lvl: 'over', label: `เลยกำหนด ${-n} วัน` };
+  if (n === 0) return { n, lvl: 'today', label: 'ครบกำหนดวันนี้' };
+  if (n === 1) return { n, lvl: 'soon', label: 'พรุ่งนี้' };
+  return { n, lvl: n <= 3 ? 'near' : 'later', label: `อีก ${n} วัน` };
+}
+const dueTag = b => b.due_date && !b.done_at && b.status !== 'cancelled' ? ` <span class="lvtag lv-${dueInfo(b.due_date).lvl}">⏰ ${dueInfo(b.due_date).label}</span>` : (b.due_date && b.done_at ? ' <span class="lvtag lv-done">✓ เสร็จแล้ว</span>' : '');
+function undoToast(msg, undo) {
+  const t = document.createElement('div'); t.className = 'toast ok'; t.innerHTML = `${esc(msg)} <button class="btn sm" style="margin-left:10px">เลิกทำ</button>`; $('#toasts').append(t);
+  const rm = setTimeout(() => t.remove(), 7000);
+  $('button', t).onclick = async () => { clearTimeout(rm); t.remove(); try { await undo(); toast('เลิกทำแล้ว', 'ok'); } catch (e) { toast(e.message, 'err'); } };
 }
 const debounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -73,13 +89,14 @@ async function viewDashboard() {
   const m = shell('dashboard'); const d = await api('/api/dashboard');
   const rows = d.recent.map(b => `<tr class="click ${b.status === 'cancelled' ? 'cancelled' : ''}" data-id="${b.id}">
     <td><span class="tag ${b.kind}">${b.kind === 'in' ? 'รับ' : 'ส่ง'}</span></td><td class="regno">${esc(b.reg_label)}</td><td class="ink">${esc(b.book_no)}</td><td class="ink nowrap">${fmtDate(b.book_date)}</td>
-    <td class="ink">${esc(b.subject)}</td><td class="ink">${esc(b.kind === 'in' ? b.from_org : b.to_org)}</td></tr>`).join('');
+    <td class="ink">${urgTag(b.urgency)}${esc(b.subject)}${dueTag(b)}</td><td class="ink">${esc(b.kind === 'in' ? b.from_org : b.to_org)}</td></tr>`).join('');
   const s = S.st.settings;
   m.innerHTML = header(`สวัสดี ${esc(shortName(getDuty()))}`, '', `${ic('clock')} <span id="today">${longToday()}</span> · <span id="clock"></span> น. &nbsp;·&nbsp; ${esc(s.duty_title)} ${esc(s.duty_unit)}`) + fontWarning() + `
     <div class="hero">
       <a class="tile in" href="#/new/in"><span class="tile-ic">${ic('inbox')}</span><span class="grow"><b>เพิ่มหนังสือรับ</b><small>เลขทะเบียนรับถัดไป <span class="num">${esc(d.next_in)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
       <a class="tile out" href="#/new/out"><span class="tile-ic">${ic('send')}</span><span class="grow"><b>เพิ่มหนังสือส่ง</b><small>เลขทะเบียนส่งถัดไป <span class="num">${esc(d.next_out)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
     </div>
+    <div id="tasks"></div>
     <div class="grid g4 stats">
       <div class="card stat"><span class="st-ic in">${ic('inbox')}</span><div><div class="l">หนังสือรับ ปีนี้</div><div class="n">${d.in_year}</div><small class="muted">ทั้งหมด ${d.in_total}</small></div></div>
       <div class="card stat"><span class="st-ic in">${ic('calendar')}</span><div><div class="l">หนังสือรับ เดือนนี้</div><div class="n">${d.in_month}</div></div></div>
@@ -96,7 +113,29 @@ async function viewDashboard() {
   $$('tr.click', m).forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id));
   const tick = () => { const c = $('#clock'); if (!c) return clearInterval(clk); const n = new Date(); c.textContent = `${p2(n.getHours())}:${p2(n.getMinutes())}`; $('#today').textContent = longToday(); };
   const clk = setInterval(tick, 15000); tick();
-  liveExcelCard($('#xlcard'));
+  liveExcelCard($('#xlcard')); tasksCard($('#tasks'));
+}
+
+/* ---------- เตือนความจำ: เรื่องที่ต้องดำเนินการ ---------- */
+async function tasksCard(el) {
+  const list = await api('/api/tasks').catch(() => null); if (!list || !el.isConnected) return;
+  if (!list.length) { el.innerHTML = `<div class="card tasks empty"><span class="tk-ok">${ic('clock')}</span><b>ไม่มีเรื่องค้าง</b><span class="muted">หนังสือที่มีกำหนด "ภายในวันที่" จะขึ้นเตือนที่นี่</span></div>`; return; }
+  const over = list.filter(t => dueInfo(t.due_date).n < 0).length;
+  el.innerHTML = `<div class="card tasks"><div class="xlhead"><div class="xlicon tk">${ic('clock')}</div><div class="grow"><h2 style="margin:0">เตือนความจำ · เรื่องที่ต้องดำเนินการ</h2>
+      <div class="muted" style="font-size:.92rem">หนังสือที่มีกำหนด "ภายในวันที่" · ทำเสร็จแล้วกด ✓ สำเร็จแล้ว</div></div>
+      <span class="pill">${list.length} เรื่อง${over ? ` · <b style="color:var(--danger)">เลยกำหนด ${over}</b>` : ''}</span></div>
+    <div class="tasklist">${list.map(t => { const d = dueInfo(t.due_date); return `<div class="task lv-${d.lvl}">
+      <div class="due"><b>${d.label}</b><small>${fmtDate(t.due_date)}</small></div>
+      <div class="grow tk-body"><div class="tk-top">${urgTag(t.urgency)}<span class="tag ${t.kind}">${t.kind === 'in' ? 'รับ' : 'ส่ง'}</span> <b class="regno">${esc(t.reg_label)}</b> <span class="muted">· ที่ ${esc(t.book_no) || '-'}</span></div>
+        <div class="tk-subj ink">${esc(t.subject)}</div><small class="muted">${t.kind === 'in' ? 'จาก ' + esc(t.from_org || '-') : 'ถึง ' + esc(t.to_org || '-')}</small></div>
+      <div class="tk-acts"><button class="btn sm" data-view="${t.id}">ดูรายละเอียด</button><button class="btn sm okbtn" data-done="${t.id}">✓ สำเร็จแล้ว</button></div></div>`; }).join('')}</div></div>`;
+  $$('[data-view]', el).forEach(b => b.onclick = () => openDetail(+b.dataset.view));
+  $$('[data-done]', el).forEach(b => b.onclick = async () => {
+    b.disabled = true; const id = b.dataset.done;
+    try { await api(`/api/books/id/${id}/done`, { method: 'POST' }); b.closest('.task').classList.add('gone'); setTimeout(() => tasksCard(el), 320);
+      undoToast('ทำเครื่องหมายว่าสำเร็จแล้ว', async () => { await api(`/api/books/id/${id}/undone`, { method: 'POST' }); if (el.isConnected) tasksCard(el); });
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  });
 }
 
 /* ---------- การ์ดไฟล์ Excel อัปเดตอัตโนมัติ ---------- */
@@ -185,6 +224,8 @@ async function viewForm(kind, editId) {
         <div class="field"><label class="f">ถึง</label>${choiceHtml('to_org', orgOpts('to_org'), edit ? edit.to_org : defTo, 'พิมพ์ชื่อหน่วยงานปลายทาง')}</div></div>
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
+      <div class="grid g2"><div class="field"><label class="f">ชั้นความเร็ว</label><div class="seg urgseg">${['', ...URG].map(u => `<label class="${u ? 'u' + (URG.indexOf(u) + 1) : ''}"><input type="radio" name="urgency" value="${u}" ${((edit && edit.urgency) || '') === u ? 'checked' : ''}>${u || 'ปกติ'}</label>`).join('')}</div></div>
+        <div class="field"><label class="f">ต้องดำเนินการภายใน <small>(เว้นว่าง = แจ้งเพื่อทราบ ไม่ต้องเตือน)</small></label><div id="due_w"></div></div></div>
       <div class="grid">${sigBlock('receiver')}</div>
       <div class="sec"><span>3</span>แนบไฟล์ <small>ไม่บังคับ · PDF, JPG, PNG ไม่เกิน 20 MB ต่อไฟล์</small></div>
       <div class="field">
@@ -197,6 +238,7 @@ async function viewForm(kind, editId) {
 
   const bd = thaiDatePicker(edit ? edit.book_date : '');
   const prefillAt = !edit; $('#book_date_w').append(bd.el); if (!edit) bd.presetMonthYear();
+  const dd = thaiDatePicker(edit ? edit.due_date || '' : ''); $('#due_w').append(dd.el); if (!edit) dd.presetMonthYear();
   wireChoice('from_org'); wireChoice('to_org');
   const syncPre = () => { const c = $('#book_pre').value === '__custom'; $('#book_suf').placeholder = c ? 'พิมพ์เลขที่หนังสือเต็มๆ ตามต้นฉบับ' : 'เลขหลัง /'; $('#book_pre').style.flex = c ? '1 1 0' : '3 1 0'; $('#book_suf').style.flex = c ? '3 1 0' : '1 1 0'; }; $('#book_pre').onchange = () => { syncPre(); $('#book_suf').focus(); }; syncPre();
   /* ---- อ่านจากรูป (OCR) แล้วกรอกให้ ---- */
@@ -215,6 +257,8 @@ async function viewForm(kind, editId) {
     if (p.from_org) { setChoice('from_org', p.from_org); got.push('จาก'); }
     if (p.to_org) { setChoice('to_org', p.to_org); got.push('ถึง'); }
     if (p.subject) { $('#subject').value = p.subject; mark($('#subject')); got.push('เรื่อง'); }
+    if (p.urgency) { const r = $(`[name=urgency][value="${p.urgency}"]`); if (r) { r.checked = true; mark(r.closest('.seg')); got.push(p.urgency); } }
+    if (p.due_date) { dd.set(p.due_date); mark($('#due_w')); got.push('ภายในวันที่'); }
     return got;
   }
   async function runOcr(file) {
@@ -287,7 +331,7 @@ async function viewForm(kind, editId) {
     if (!g('subject')) { toast('กรุณากรอก "เรื่อง"', 'err'); $('#subject').focus(); return; }
     if (!bd.get()) { toast('กรุณาเลือก "ลงวันที่" จากปฏิทิน', 'err'); return; }
     if (!g('receiver_name')) { toast('กรุณาเลือกชื่อผู้รับหนังสือ / ผู้บันทึก', 'err'); $('#receiver_name').focus(); return; }
-    const body = { book_no: bookNo(), book_date: bd.get(), from_org: getChoice('from_org'), to_org: getChoice('to_org'), subject: g('subject'), action: g('receiver_name'), remark: g('remark'), receiver_name: g('receiver_name') };
+    const body = { book_no: bookNo(), book_date: bd.get(), from_org: getChoice('from_org'), to_org: getChoice('to_org'), subject: g('subject'), action: g('receiver_name'), remark: g('remark'), receiver_name: g('receiver_name'), urgency: ($('[name=urgency]:checked') || {}).value || '', due_date: dd.get() };
     for (const who of ['receiver']) {
       const d_ = dt[who].get(); const t = getT(who);
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
@@ -408,7 +452,7 @@ async function viewList(kind) {
     $('#rows').innerHTML = r.rows.length ? r.rows.map(b => `<tr class="click ${b.status}" data-id="${b.id}"><td class="nostrike"><input type="checkbox" data-sel="${b.id}" ${sel.has(b.id) ? 'checked' : ''}></td>
       ${isAll ? `<td class="nostrike"><span class="tag ${b.kind}">${b.kind === 'in' ? 'รับ' : 'ส่ง'}</span></td>` : ''}
       <td class="regno nostrike">${esc(b.reg_label)}${b.status === 'cancelled' ? ' <span class="tag x">ยกเลิก</span>' : ''}</td><td class="ink">${esc(b.book_no)}</td><td class="ink" style="white-space:nowrap">${fmtDate(b.book_date)}</td>
-      <td class="ink">${esc(b.from_org)}</td><td class="ink">${esc(b.to_org)}</td><td class="ink">${esc(b.subject)}</td><td class="ink">${esc(b.action)}</td><td class="ink">${esc(b.remark)}</td>
+      <td class="ink">${esc(b.from_org)}</td><td class="ink">${esc(b.to_org)}</td><td class="ink">${urgTag(b.urgency)}${esc(b.subject)}${dueTag(b)}</td><td class="ink">${esc(b.action)}</td><td class="ink">${esc(b.remark)}</td>
       <td class="nostrike">${b.att_count ? '📎' : ''}${b.has_sender_sig || b.has_receiver_sig ? '✍️' : ''}</td></tr>`).join('') : `<tr><td colspan="12" class="muted" style="text-align:center;padding:30px">ไม่พบรายการ</td></tr>`;
     $$('#rows tr.click').forEach(tr => tr.onclick = e => { if (e.target.matches('input')) return; openDetail(+tr.dataset.id); });
     $$('[data-sel]').forEach(c => c.onchange = () => { c.checked ? sel.add(+c.dataset.sel) : sel.delete(+c.dataset.sel); syncSel(); });
@@ -433,8 +477,8 @@ async function viewList(kind) {
 }
 
 /* ---------- รายละเอียดรายการ ---------- */
-const ACT = { create: 'สร้างรายการ', update: 'แก้ไขข้อมูล', cancel: 'ยกเลิกรายการ', attach_add: 'แนบไฟล์', attach_remove: 'ลบไฟล์แนบ' };
-const FL = { book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', sender_name: 'ผู้ส่ง', receiver_name: 'ผู้รับ', sender_at: 'วันเวลาส่ง', receiver_at: 'วันเวลารับ', sender_sig: 'ลายเซ็นผู้ส่ง', receiver_sig: 'ลายเซ็นผู้รับ' };
+const ACT = { done: 'ทำเสร็จแล้ว', undone: 'เปลี่ยนเป็นยังไม่เสร็จ', create: 'สร้างรายการ', update: 'แก้ไขข้อมูล', cancel: 'ยกเลิกรายการ', attach_add: 'แนบไฟล์', attach_remove: 'ลบไฟล์แนบ' };
+const FL = { urgency: 'ชั้นความเร็ว', due_date: 'ต้องดำเนินการภายใน', book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', sender_name: 'ผู้ส่ง', receiver_name: 'ผู้รับ', sender_at: 'วันเวลาส่ง', receiver_at: 'วันเวลารับ', sender_sig: 'ลายเซ็นผู้ส่ง', receiver_sig: 'ลายเซ็นผู้รับ' };
 function histText(h) {
   const c = h.changes || {};
   if (h.action === 'update') return Object.entries(c).map(([k, [a, b]]) => `${FL[k] || k}: “${esc(a || '-')}” → “${esc(b || '-')}”`).join('<br>');
@@ -450,12 +494,17 @@ async function openDetail(id) {
     ${cancelled ? `<div class="notice err">ยกเลิกเมื่อ ${fmtStamp(b.cancelled_at)} — เหตุผล: ${esc(b.cancel_reason)} (เลขทะเบียนนี้ถูกเก็บไว้ ไม่นำกลับมาใช้ใหม่)</div>` : ''}
     <dl class="kv ink"><dt>ที่</dt><dd>${esc(b.book_no) || '-'}</dd><dt>ลงวันที่</dt><dd>${fmtDate(b.book_date)}</dd><dt>วันที่ลงทะเบียน</dt><dd>${fmtDate(b.reg_date)}</dd>
       <dt>จาก</dt><dd>${esc(b.from_org) || '-'}</dd><dt>ถึง</dt><dd>${esc(b.to_org) || '-'}</dd><dt>เรื่อง</dt><dd>${esc(b.subject)}</dd><dt>การปฏิบัติ</dt><dd>${esc(b.action) || '-'}</dd><dt>หมายเหตุ</dt><dd>${esc(b.remark) || '-'}</dd></dl>
+    ${b.urgency || b.due_date ? `<div class="duebox">${urgTag(b.urgency)}${b.due_date ? `<span>ต้องดำเนินการภายใน <b>${fmtDate(b.due_date)}</b></span>${b.done_at ? `<span class="lvtag lv-done">✓ สำเร็จแล้ว ${fmtStamp(b.done_at)}${b.done_by ? ' · ' + esc(shortName(b.done_by)) : ''}</span>` : (cancelled ? '' : `<span class="lvtag lv-${dueInfo(b.due_date).lvl}">⏰ ${dueInfo(b.due_date).label}</span>`)}` : ''}
+      <span class="grow"></span>${!cancelled && b.due_date ? (b.done_at ? '<button class="btn sm" data-undone>เปลี่ยนเป็นยังไม่เสร็จ</button>' : '<button class="btn sm okbtn" data-done>✓ สำเร็จแล้ว</button>') : ''}</div>` : ''}
     <div style="margin:12px 0">${sig('receiver', b.receiver_name, b.receiver_at)}</div>
     <h2>ไฟล์แนบ</h2>${b.attachments.length ? b.attachments.map(a => `<div class="att"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small></div>`).join('') : '<p class="muted">ไม่มี</p>'}
     <h2 style="margin-top:12px">ประวัติการแก้ไข</h2><ul class="hist">${b.history.map(h => `<li><b>${ACT[h.action] || h.action}</b> <small class="muted">${fmtStamp(h.at)}${h.actor ? ' · โดย ' + esc(h.actor) : ''}</small><div>${histText(h)}</div></li>`).join('')}</ul>
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-close>ปิด</button><a class="btn" data-print href="#/reports?${qs({ kind: b.kind, scope: 'selected', ids: b.id })}">🖨️ พิมพ์รายการนี้</a>
       ${cancelled ? '' : `<button class="btn danger" data-cancel>ยกเลิกรายการ</button><a class="btn primary" data-edit href="#/edit/${b.id}">✏️ แก้ไข</a>`}</div>`);
   $('[data-close]', m.el).onclick = m.close;
+  for (const [sel, path, msg] of [['[data-done]', 'done', 'ทำเครื่องหมายว่าสำเร็จแล้ว'], ['[data-undone]', 'undone', 'เปลี่ยนเป็นยังไม่เสร็จแล้ว']]) {
+    const bt = $(sel, m.el); if (bt) bt.onclick = async () => { try { await api(`/api/books/id/${b.id}/${path}`, { method: 'POST' }); toast(msg, 'ok'); m.close(); route(); } catch (e) { toast(e.message, 'err'); } };
+  }
   for (const a of $$('[data-print],[data-edit]', m.el)) a.addEventListener('click', () => m.close());
   const cb = $('[data-cancel]', m.el);
   if (cb) cb.onclick = async () => {
@@ -735,6 +784,74 @@ function listEditor(host, items, o = {}) {
   return { get: () => list.slice() };
 }
 
+/* ---------- สถิติรายเดือน ---------- */
+async function viewStats(params) {
+  const m = shell('stats');
+  const st = await api('/api/stats?' + qs({ year: params.year || '' })); if (!m.isConnected) return;
+  const yearOpts = st.years.map(y => `<option value="${y}" ${y === st.year ? 'selected' : ''}>${st.fiscal ? 'ปีงบประมาณ' : 'ปี'} ${y}</option>`).join('');
+  const urgTotal = Object.values(st.urgency).reduce((a, b) => a + b, 0);
+  const done = st.due.on_time + st.due.late;
+  m.innerHTML = header('สถิติรายเดือน', `<select id="stYear" style="width:220px">${yearOpts}</select>`, `${ic('chart')} ${st.fiscal ? 'ปีงบประมาณ' : 'ปีปฏิทิน'} ${st.year} · ไม่นับรายการที่ยกเลิก${st.totals.cancelled ? ` (ยกเลิก ${st.totals.cancelled} รายการ)` : ''}`) + `
+    <div class="grid g4 stats">
+      <div class="card stat"><span class="st-ic in">${ic('inbox')}</span><div><div class="l">หนังสือรับ ทั้งปี</div><div class="n">${st.totals.in}</div></div></div>
+      <div class="card stat"><span class="st-ic out">${ic('send')}</span><div><div class="l">หนังสือส่ง ทั้งปี</div><div class="n">${st.totals.out}</div></div></div>
+      <div class="card stat"><span class="st-ic urgic">${ic('clock')}</span><div><div class="l">หนังสือด่วน</div><div class="n">${urgTotal}</div><small class="muted">${['ด่วน', 'ด่วนมาก', 'ด่วนที่สุด'].map(u => `${u} ${st.urgency[u]}`).join(' · ')}</small></div></div>
+      <div class="card stat"><span class="st-ic okic">✓</span><div><div class="l">มีกำหนดดำเนินการ</div><div class="n">${st.due.total}</div><small class="muted">เสร็จทันกำหนด ${st.due.on_time}${done ? ` (${Math.round(st.due.on_time * 100 / done)}%)` : ''}</small></div></div>
+    </div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">จำนวนหนังสือรายเดือน</h2>
+      <div class="legend"><span><i class="sw s1"></i>หนังสือรับ</span><span><i class="sw s2"></i>หนังสือส่ง</span></div></div>
+      <div class="chartwrap" id="chart"></div>
+      <details class="tblview"><summary>ดูเป็นตาราง</summary><div class="tw" style="max-height:none;margin-top:8px"><table class="t"><thead><tr><th>เดือน</th><th class="right">หนังสือรับ</th><th class="right">หนังสือส่ง</th><th class="right">รวม</th></tr></thead>
+        <tbody>${st.months.map(x => `<tr><td>${x.full}</td><td class="right">${x.in}</td><td class="right">${x.out}</td><td class="right"><b>${x.in + x.out}</b></td></tr>`).join('')}
+        <tr><td><b>รวมทั้งปี</b></td><td class="right"><b>${st.totals.in}</b></td><td class="right"><b>${st.totals.out}</b></td><td class="right"><b>${st.totals.in + st.totals.out}</b></td></tr></tbody></table></div></details></div>
+    <div class="grid g2">
+      <div class="card"><h2>หน่วยที่ส่งหนังสือมาบ่อย <small class="muted">(หนังสือรับ · จาก)</small></h2><div id="topFrom"></div></div>
+      <div class="card"><h2>หน่วยที่เราส่งหนังสือไปบ่อย <small class="muted">(หนังสือส่ง · ถึง)</small></h2><div id="topTo"></div></div>
+    </div>
+    <div class="card"><h2>การดำเนินการตามกำหนด</h2><div class="duegrid">
+      <div class="dg ok">✓ <b>${st.due.on_time}</b><span>เสร็จทันกำหนด</span></div><div class="dg warn">⚠ <b>${st.due.late}</b><span>เสร็จช้ากว่ากำหนด</span></div>
+      <div class="dg info">⏰ <b>${st.due.pending}</b><span>ยังไม่ถึงกำหนด</span></div><div class="dg bad">✕ <b>${st.due.overdue}</b><span>เลยกำหนด ยังไม่เสร็จ</span></div></div></div>`;
+  $('#stYear').onchange = () => { location.hash = '#/stats?year=' + $('#stYear').value; };
+  drawMonthChart($('#chart'), st.months);
+  hbars($('#topFrom'), st.top_from, 's1'); hbars($('#topTo'), st.top_to, 's2');
+}
+// แผนภูมิแท่งคู่รายเดือน (รับ/ส่ง) — SVG + กล่องรายละเอียดเมื่อชี้
+function drawMonthChart(el, months) {
+  const W = 900, H = 290, L = 40, R = 10, T = 22, B = 44, pw = W - L - R, ph = H - T - B;
+  const max = Math.max(1, ...months.map(x => Math.max(x.in, x.out)));
+  const step = max <= 5 ? 1 : Math.pow(10, Math.floor(Math.log10(max / 4))) * ([1, 2, 5, 10].find(f => Math.pow(10, Math.floor(Math.log10(max / 4))) * f * 4 >= max) || 10);
+  const top = Math.ceil(max / step) * step, y = v => T + ph - v / top * ph, gw = pw / 12, bw = Math.min(24, gw * 0.3);
+  const bar = (x, v, cls) => { if (!v) return ''; const h = Math.max(2, ph - (y(v) - T)), yy = T + ph - h, r = Math.min(4, bw / 2, h);
+    return `<path class="${cls}" d="M${x},${T + ph} V${yy + r} Q${x},${yy} ${x + r},${yy} H${x + bw - r} Q${x + bw},${yy} ${x + bw},${yy + r} V${T + ph} Z"/>`; };
+  const peak = k => { const mx = Math.max(...months.map(x => x[k])); return mx ? months.findIndex(x => x[k] === mx) : -1; };
+  const pi = peak('in'), po = peak('out');
+  let g = '';
+  for (let v = 0; v <= top; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  months.forEach((mo, i) => {
+    const cx = L + gw * i + gw / 2, x1 = cx - bw - 1, x2 = cx + 1;
+    g += bar(x1, mo.in, 's1') + bar(x2, mo.out, 's2');
+    if (i === pi) g += `<text class="dl" x="${x1 + bw / 2}" y="${y(mo.in) - 6}" text-anchor="middle">${mo.in}</text>`;
+    if (i === po) g += `<text class="dl" x="${x2 + bw / 2}" y="${y(mo.out) - 6}" text-anchor="middle">${mo.out}</text>`;
+    g += `<text class="ax" x="${cx}" y="${H - B + 20}" text-anchor="middle">${mo.short}</text>`;
+    if (i === 0 || mo.short === 'ม.ค.') g += `<text class="ax sub" x="${cx}" y="${H - B + 38}" text-anchor="middle">${mo.yy}</text>`;
+    g += `<rect class="hit" data-i="${i}" x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}"/>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="จำนวนหนังสือรับและส่งรายเดือน"><line class="base" x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}"/>${g}</svg><div class="tip" hidden></div>`;
+  const tip = $('.tip', el), svg = $('svg', el);
+  $$('.hit', el).forEach(h => {
+    h.onmouseenter = () => { const mo = months[+h.dataset.i]; h.classList.add('on');
+      tip.innerHTML = `<b>${mo.full}</b><div><i class="sw s1"></i>หนังสือรับ <b>${mo.in}</b></div><div><i class="sw s2"></i>หนังสือส่ง <b>${mo.out}</b></div>`; tip.hidden = false;
+      const r = svg.getBoundingClientRect(), hb = h.getBoundingClientRect(); let left = hb.left - r.left + hb.width / 2 + 12; if (left > r.width - 170) left = hb.left - r.left - 170; tip.style.left = left + 'px'; tip.style.top = '10px'; };
+    h.onmouseleave = () => { h.classList.remove('on'); tip.hidden = true; };
+  });
+}
+// แท่งแนวนอน (หน่วยงานที่พบบ่อย)
+function hbars(el, rows, cls) {
+  if (!rows.length) { el.innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; return; }
+  const max = Math.max(...rows.map(r => r.n));
+  el.innerHTML = `<div class="hb">${rows.map(r => `<div class="hb-row" title="${esc(r.name)}: ${r.n} ฉบับ"><span class="hb-name">${esc(r.name)}</span><span class="hb-track"><i class="${cls}" style="width:${Math.max(2, r.n / max * 100)}%"></i></span><b class="hb-n">${r.n}</b></div>`).join('')}</div>`;
+}
+
 /* ---------- บันทึกการใช้งาน (log) ---------- */
 async function viewActivity() {
   const m = shell('activity');
@@ -969,6 +1086,7 @@ async function route() {
     else if (path === 'settings') await viewSettings();
     else if (path === 'backup') await viewBackup();
     else if (path === 'activity') await viewActivity();
+    else if (path === 'stats') await viewStats(params);
     else location.hash = '#/dashboard';
   } catch (e) { if (myNav !== navSeq) return; if (e.message !== 'กรุณาเข้าสู่ระบบ') { (S.st ? shell('') : $('#app')).innerHTML = `<div class="card notice err" style="margin:20px">${esc(e.message)}</div>`; } }
 }
