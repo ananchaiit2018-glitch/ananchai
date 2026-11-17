@@ -216,6 +216,7 @@ function createApp() {
   app.get('/api/dashboard', wrap((req, res) => res.json(books.dashboard())));
   app.get('/api/suggest', wrap((req, res) => res.json(books.suggest(req.query.field, req.query.q))));
   app.get('/api/books', wrap((req, res) => res.json(books.list(req.query))));
+  app.post('/api/books/dupcheck/:kind', wrap((req, res) => res.json(books.findDuplicates(req.params.kind, req.body || {}, +(req.body || {}).except || 0))));
   app.post('/api/books/:kind', wrap((req, res) => res.status(201).json(books.create(req.params.kind, req.body || {}))));
   app.get('/api/books/id/:id', wrap((req, res) => res.json(books.get(+req.params.id))));
   app.put('/api/books/id/:id', wrap((req, res) => res.json(books.update(+req.params.id, req.body || {}))));

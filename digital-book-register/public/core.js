@@ -80,10 +80,10 @@ function modal(inner, { small = false, onClose } = {}) {
   document.body.append(bg);
   return { el: bg.firstElementChild, close };
 }
-function confirmBox(title, body, okText = 'ตกลง', danger = false) {
+function confirmBox(title, body, okText = 'ตกลง', danger = false, noText = 'ยกเลิก') {
   return new Promise(res => {
     const m = modal(`<h2>${esc(title)}</h2><div>${body}</div><div class="row" style="margin-top:16px;justify-content:flex-end">
-      <button class="btn" data-no>ยกเลิก</button><button class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(okText)}</button></div>`, { small: true, onClose: () => res(false) });
+      <button class="btn" data-no>${esc(noText)}</button><button class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(okText)}</button></div>`, { small: true, onClose: () => res(false) });
     $('[data-no]', m.el).onclick = () => m.close();
     $('[data-ok]', m.el).onclick = () => { res(true); m.el.parentElement.remove(); };
   });

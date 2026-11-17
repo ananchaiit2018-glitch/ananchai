@@ -343,5 +343,14 @@ function signaturePath(id, who) {
   return path.join(cfg.DIRS.signatures, f);
 }
 
-module.exports = { registrationYear, label, create, update, cancel, get, list, listForExport, dashboard, suggest, counters, setNext, peekNext, relabelAll,
+// หารายการที่อาจลงซ้ำ (เฉพาะที่ยังใช้งาน ในทะเบียนเดียวกัน): ช่อง "ที่" ตรงกัน (ไม่สนช่องว่าง) หรือ เรื่อง+ลงวันที่ ตรงกัน
+function findDuplicates(kind, { book_no = '', subject = '', book_date = '' } = {}, exceptId = 0) {
+  const ns = s => String(s || '').replace(/\s+/g, '');
+  const no = ns(book_no), subj = ns(subject);
+  if (!no && !(subj && book_date)) return [];
+  return db.get().prepare("SELECT id, reg_label, book_no, book_date, subject FROM books WHERE kind=? AND status='active' AND id<>? ORDER BY id DESC").all(kind === 'out' ? 'out' : 'in', exceptId || 0)
+    .filter(b => (no && ns(b.book_no) === no) || (subj && book_date && b.book_date === book_date && ns(b.subject) === subj)).slice(0, 5);
+}
+
+module.exports = { findDuplicates, registrationYear, label, create, update, cancel, get, list, listForExport, dashboard, suggest, counters, setNext, peekNext, relabelAll,
   addAttachment, getAttachment, removeAttachment, signaturePath, FIELD_LABELS };

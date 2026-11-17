@@ -49,3 +49,14 @@ test('เลือกโฟลเดอร์สำรอง: เรียกด
   for (const bad of ['..', 'a/b', 'a\\b', '', 'x:y']) assert.equal((await jj('/api/fs/mkdir', { json: { parent: tmp, name: bad } })).s, 400, bad);
   assert.equal((await jj('/api/fs/list?path=' + encodeURIComponent(path.join(tmp, 'ไม่มีจริง')))).s, 400);
 });
+test('เตือนลงซ้ำ: ที่ ตรงกัน (ไม่สนช่องว่าง) / เรื่อง+ลงวันที่ ตรงกัน / ไม่นับรายการที่ยกเลิก / คนละทะเบียนไม่นับ', async () => {
+  const a = (await jj('/api/books/in', { json: { book_date: '2026-11-01', subject: 'เรื่องทดสอบซ้ำ', book_no: 'กห 0401/ 777' } })).d;
+  const chk = async (kind, body) => (await jj('/api/books/dupcheck/' + kind, { json: body })).d.map(x => x.id);
+  assert.deepEqual(await chk('in', { book_no: 'กห0401/777' }), [a.id]);
+  assert.deepEqual(await chk('in', { subject: 'เรื่องทดสอบ ซ้ำ', book_date: '2026-11-01' }), [a.id]);
+  assert.deepEqual(await chk('in', { subject: 'เรื่องทดสอบซ้ำ', book_date: '2026-11-02' }), []);
+  assert.deepEqual(await chk('out', { book_no: 'กห 0401/777' }), []);
+  assert.deepEqual(await chk('in', { book_no: 'กห 0401/777', except: a.id }), []);
+  await jj(`/api/books/id/${a.id}/cancel`, { json: { reason: 'ลงซ้ำ' } });
+  assert.deepEqual(await chk('in', { book_no: 'กห 0401/777' }), []);
+});

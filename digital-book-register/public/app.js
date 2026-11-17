@@ -275,6 +275,9 @@ async function viewForm(kind, editId) {
       const d_ = dt[who].get(); const t = getT(who);
       body[who + '_at'] = d_ ? `${d_}T${t || '00:00'}` : '';
     }
+    // เตือนถ้าอาจลงซ้ำ (ที่ ตรงกัน หรือ เรื่อง+ลงวันที่ ตรงกัน)
+    const dups = await api('/api/books/dupcheck/' + kind, { json: { book_no: body.book_no, subject: body.subject, book_date: body.book_date, except: edit ? edit.id : 0 } }).catch(() => []);
+    if (dups.length && !await confirmBox('⚠️ หนังสือนี้อาจลงซ้ำ', `<p>ดูเหมือนเคยลงทะเบียนไปแล้ว:</p><ul class="duplist">${dups.map(d => `<li><b>${esc(d.reg_label)}</b> · ที่ ${esc(d.book_no || '-')} · ลงวันที่ ${fmtDate(d.book_date)}<br><span class="muted">${esc(d.subject)}</span></li>`).join('')}</ul><p>ถ้าเป็นหนังสือคนละฉบับ กด <b>บันทึกต่อ</b> ได้เลย</p>`, 'บันทึกต่อ', false, 'กลับไปตรวจ')) return;
     const files = [...$('#files').files];
     saving = true; $('#save').disabled = true; $('#msg').textContent = 'กำลังบันทึก...';
     try {
