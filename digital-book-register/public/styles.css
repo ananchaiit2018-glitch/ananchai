@@ -352,3 +352,4 @@ label.chk input{margin-top:.3em}
 .actions.two{grid-template-columns:1fr 1fr}.actions.two .act{flex-direction:row;justify-content:center;gap:12px;padding:14px}
 .duplist{margin:6px 0 10px;padding-left:20px}.duplist li{margin-bottom:6px}
 .carry{border-left:5px solid var(--accent)}.carry-f{display:inline-flex;align-items:center;gap:8px;font-weight:600}.carry-f input{width:120px}
+.carrybox{padding:14px 16px;border-radius:14px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);margin-bottom:14px}.carrybox>b{display:flex;align-items:center;gap:8px;color:var(--heading)}

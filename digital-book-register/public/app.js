@@ -80,7 +80,6 @@ async function viewDashboard() {
       <a class="tile in" href="#/new/in"><span class="tile-ic">${ic('inbox')}</span><span class="grow"><b>เพิ่มหนังสือรับ</b><small>เลขทะเบียนรับถัดไป <span class="num">${esc(d.next_in)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
       <a class="tile out" href="#/new/out"><span class="tile-ic">${ic('send')}</span><span class="grow"><b>เพิ่มหนังสือส่ง</b><small>เลขทะเบียนส่งถัดไป <span class="num">${esc(d.next_out)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
     </div>
-    <div id="carry"></div>
     <div class="grid g4 stats">
       <div class="card stat"><span class="st-ic in">${ic('inbox')}</span><div><div class="l">หนังสือรับ ปีนี้</div><div class="n">${d.in_year}</div><small class="muted">ทั้งหมด ${d.in_total}</small></div></div>
       <div class="card stat"><span class="st-ic in">${ic('calendar')}</span><div><div class="l">หนังสือรับ เดือนนี้</div><div class="n">${d.in_month}</div></div></div>
@@ -98,32 +97,6 @@ async function viewDashboard() {
   const tick = () => { const c = $('#clock'); if (!c) return clearInterval(clk); const n = new Date(); c.textContent = `${p2(n.getHours())}:${p2(n.getMinutes())}`; $('#today').textContent = longToday(); };
   const clk = setInterval(tick, 15000); tick();
   liveExcelCard($('#xlcard'));
-  if (!d.in_year && !d.out_year) carryOverCard($('#carry'));
-}
-
-/* ---------- ต่อเลขจากสมุดทะเบียนเล่มเดิม (แสดงเมื่อปีนี้ยังไม่มีรายการ) ---------- */
-async function carryOverCard(el) {
-  let hide = false; try { hide = localStorage.getItem('carryDone-' + S.st.year) === '1'; } catch { /* ignore */ }
-  if (hide) return;
-  const cs = await api('/api/counters').catch(() => []); if (!el.isConnected) return;
-  const cur = k => { const c = cs.find(x => x.kind === k && x.year === S.st.year); return c ? c.next_no - 1 : 0; };
-  el.innerHTML = `<div class="card carry"><div class="xlhead"><div class="xlicon" style="color:var(--accent)">${ic('book')}</div><div class="grow">
-      <h2 style="margin:0">เคยลงในสมุดมาก่อนไหม? ต่อเลขจากสมุดได้เลย</h2>
-      <div class="muted" style="font-size:.92rem">ใส่เลขทะเบียน<b>ตัวสุดท้าย</b>ที่เขียนในสมุด ปี ${S.st.year} โปรแกรมจะเริ่มเลขถัดไปให้ (ถ้าเริ่มนับ 1 ใหม่ในคอม กด "ไม่ต้อง")</div></div></div>
-    <div class="row" style="margin-top:12px">
-      <label class="carry-f">ทะเบียนรับ ถึงเลข <input type="number" id="cIn" min="0" value="${cur('in') || ''}" placeholder="เช่น 50"></label>
-      <label class="carry-f">ทะเบียนส่ง ถึงเลข <input type="number" id="cOut" min="0" value="${cur('out') || ''}" placeholder="เช่น 43"></label>
-      <button class="btn primary" id="cGo">${ic('save')} ต่อเลขจากสมุด</button><span class="grow"></span><button class="btn sm" id="cNo">ไม่ต้อง เริ่มเลข 1</button></div></div>`;
-  const done = () => { try { localStorage.setItem('carryDone-' + S.st.year, '1'); } catch { /* ignore */ } };
-  $('#cNo', el).onclick = () => { done(); el.innerHTML = ''; };
-  $('#cGo', el).onclick = async () => {
-    const vals = { in: parseInt($('#cIn', el).value, 10), out: parseInt($('#cOut', el).value, 10) };
-    if (!(vals.in > 0) && !(vals.out > 0)) { toast('ใส่เลขตัวสุดท้ายในสมุดอย่างน้อย 1 ช่อง', 'err'); return; }
-    const msg = ['in', 'out'].filter(k => vals[k] > 0).map(k => `${k === 'in' ? 'ทะเบียนรับ' : 'ทะเบียนส่ง'} เริ่มที่เลข <b>${vals[k] + 1}</b>`).join('<br>');
-    if (!await confirmBox('ต่อเลขจากสมุดเดิม', `<p>${msg}</p><p class="muted">ปี ${S.st.year} · ตรวจเลขให้ถูกก่อนนะ (ตั้งแล้วลดเลขลงไม่ได้ ถ้ามีรายการบันทึกแล้ว)</p>`, 'ยืนยัน')) return;
-    try { for (const k of ['in', 'out']) if (vals[k] > 0) await api('/api/counters', { method: 'PUT', json: { kind: k, year: S.st.year, next_no: vals[k] + 1 } });
-      done(); toast('ตั้งเลขต่อจากสมุดแล้ว', 'ok'); route(); } catch (e) { toast(e.message, 'err', 8000); }
-  };
 }
 
 /* ---------- การ์ดไฟล์ Excel อัปเดตอัตโนมัติ ---------- */
@@ -532,7 +505,13 @@ async function viewSettings() {
     <div class="field"><label class="f">ชื่อส่วนราชการ</label><input type="text" id="dept_name" class="ink" value="${esc(s.dept_name)}"></div></div>
     <div class="field"><label class="f">โลโก้หน่วยงาน (PNG/JPG ไม่เกิน 2 MB)</label>${s.logo ? '<img src="/api/logo?' + Date.now() + '" style="height:60px;display:block;margin-bottom:6px" alt="">' : ''}
       <div class="row"><input type="file" id="logo" accept=".png,.jpg,.jpeg"><button class="btn sm danger" id="logodel" ${s.logo ? '' : 'hidden'}>ลบโลโก้</button></div></div></div>
-  <div class="card"><h2>เลขทะเบียน</h2><div class="grid g3">
+  <div class="card"><h2>เลขทะเบียน</h2>
+    <div class="carrybox"><b>${ic('book')} ต่อเลขจากสมุดทะเบียนเล่มเดิม</b>
+      <div class="muted" style="font-size:.92rem;margin:2px 0 8px">ใส่เลขทะเบียน<b>ตัวสุดท้าย</b>ที่เขียนในสมุด ปี ${cy} โปรแกรมจะเริ่มเลขถัดไปต่อให้ (เว้นช่องว่างได้ถ้าไม่ต้องการตั้ง)</div>
+      <div class="row"><label class="carry-f">ทะเบียนรับ ถึงเลข <input type="number" id="cIn" min="1" placeholder="เช่น 50"></label>
+        <label class="carry-f">ทะเบียนส่ง ถึงเลข <input type="number" id="cOut" min="1" placeholder="เช่น 43"></label>
+        <button class="btn primary" id="cGo">${ic('save')} ต่อเลขจากสมุด</button></div></div>
+    <div class="grid g3">
     <div class="field"><label class="f">ปี พ.ศ. ที่ใช้ออกเลข</label><select id="year_mode"><option value="fiscal">ปีงบประมาณ (เริ่ม 1 ต.ค. เช่น ต.ค. 2569 = 2570)</option><option value="auto">ปีปฏิทิน (ตามวันที่ของเครื่อง)</option><option value="manual">กำหนดปีเอง</option></select>
       <input type="number" id="year_val" placeholder="เช่น 2569" style="margin-top:6px" hidden></div>
     <div class="field"><label class="f">รูปแบบเลขทะเบียน <small>({no}=ลำดับ {year}=ปี พ.ศ.)</small></label><input type="text" id="reg_format" value="${esc(s.reg_format)}"></div>
@@ -566,7 +545,7 @@ async function viewSettings() {
     book_no_prefixes: listEditor($('#book_no_prefixes'), jl('book_no_prefixes'), { ph: 'เช่น นร ๕๑๑๙.๑ (ร้อย ฉก.ตชด.๔๔๔)๘๔/', onChange: markDirty }),
     from_options: listEditor($('#from_options'), jl('from_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }),
     to_options: listEditor($('#to_options'), jl('to_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }) };
-  $$('.card input:not(.le-new), .card select', m).forEach(i => i.addEventListener('input', markDirty));
+  $$('.card input:not(.le-new):not(#cIn):not(#cOut):not([data-nk]), .card select', m).forEach(i => i.addEventListener('input', markDirty));   // ช่องที่มีปุ่มบันทึกของตัวเองไม่นับ
   $$('[name=ui_font],[name=ui_scale]', m).forEach(r => r.addEventListener('change', () => applyUiFont(($('[name=ui_font]:checked') || {}).value, $('[name=ui_scale]:checked').value)));
   const ym = /^\d{4}$/.test(s.year_mode); $('#year_mode').value = ym ? 'manual' : (s.year_mode === 'auto' ? 'auto' : 'fiscal'); $('#year_val').value = ym ? s.year_mode : ''; $('#year_val').hidden = !ym;
   $('#year_mode').onchange = () => { $('#year_val').hidden = $('#year_mode').value !== 'manual'; if (!$('#year_val').hidden && !$('#year_val').value) $('#year_val').value = S.st.year; };
@@ -578,6 +557,14 @@ async function viewSettings() {
         start_in: g('start_in'), start_out: g('start_out'), ui_font: $('[name=ui_font]:checked') ? $('[name=ui_font]:checked').value : 'plex', ui_scale: $('[name=ui_scale]:checked').value, print_font_size: g('print_font_size'), data_color: g('data_color') } });
       toast('บันทึกการตั้งค่าเรียบร้อย', 'ok'); await loadState(); viewSettings();
     } catch (e) { toast(e.message, 'err', 7000); }
+  };
+  $('#cGo').onclick = async () => {
+    const vals = { in: parseInt($('#cIn').value, 10), out: parseInt($('#cOut').value, 10) };
+    if (!(vals.in > 0) && !(vals.out > 0)) { toast('ใส่เลขตัวสุดท้ายในสมุดอย่างน้อย 1 ช่อง', 'err'); return; }
+    const msg = ['in', 'out'].filter(k => vals[k] > 0).map(k => `${k === 'in' ? 'ทะเบียนรับ' : 'ทะเบียนส่ง'} เริ่มที่เลข <b>${vals[k] + 1}</b>`).join('<br>');
+    if (!await confirmBox('ต่อเลขจากสมุดเดิม', `<p>${msg}</p><p class="muted">ปี ${cy} · ตรวจเลขให้ถูกก่อนนะ (ถ้าบันทึกรายการไปแล้ว จะลดเลขลงไม่ได้)</p>`, 'ยืนยัน')) return;
+    try { for (const k of ['in', 'out']) if (vals[k] > 0) await api('/api/counters', { method: 'PUT', json: { kind: k, year: cy, next_no: vals[k] + 1 } });
+      toast('ตั้งเลขต่อจากสมุดแล้ว', 'ok'); viewSettings(); } catch (e) { toast(e.message, 'err', 8000); }
   };
   $$('[data-setnext]').forEach(b => b.onclick = async () => {
     const [k, y] = b.dataset.setnext.split(':'); const v = $(`[data-nk=${k}][data-ny="${y}"]`).value;
