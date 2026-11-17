@@ -349,3 +349,4 @@ td.nowrap{white-space:nowrap}
 label.chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
 label.chk input{margin-top:.3em}
 @media (max-width:980px){.arcgrid{grid-template-columns:1fr}}
+.actions.two{grid-template-columns:1fr 1fr}.actions.two .act{flex-direction:row;justify-content:center;gap:12px;padding:14px}

@@ -3,7 +3,7 @@
 const S = { st: null };          // สถานะที่โหลดจากเซิร์ฟเวอร์ (ตั้งค่า, ฟอนต์, ปี)
 const KIND = { in: 'หนังสือรับ', out: 'หนังสือส่ง' };
 const MENU = [
-  ['grp', 'งานประจำวัน'], ['dashboard', 'home', 'หน้าหลัก'], ['new/in', 'inbox', 'เพิ่มหนังสือรับ'], ['new/out', 'send', 'เพิ่มหนังสือส่ง'],
+  ['dashboard', 'home', 'หน้าหลัก'],   // ปุ่มเพิ่มหนังสือรับ/ส่ง อยู่ที่หน้าหลัก (ปุ่มใหญ่) และหน้าทะเบียน (＋ เพิ่ม) แล้ว
   ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['reports', 'printer', 'พิมพ์และส่งออก'],
   ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'], ['activity', 'log', 'ประวัติการใช้งาน'],
 ];
@@ -86,13 +86,9 @@ async function viewDashboard() {
       <div class="card stat"><span class="st-ic out">${ic('send')}</span><div><div class="l">หนังสือส่ง ปีนี้</div><div class="n">${d.out_year}</div><small class="muted">ทั้งหมด ${d.out_total}</small></div></div>
       <div class="card stat"><span class="st-ic out">${ic('calendar')}</span><div><div class="l">หนังสือส่ง เดือนนี้</div><div class="n">${d.out_month}</div></div></div>
     </div>
-    <div class="actions">
-      <a class="act" href="#/search">${ic('search')}<span>ค้นหาหนังสือ</span></a>
-      <a class="act" href="#/list/in">${ic('book')}<span>ทะเบียนรับ</span></a>
-      <a class="act" href="#/list/out">${ic('book')}<span>ทะเบียนส่ง</span></a>
-      <a class="act" href="#/reports?kind=in&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนรับ</span></a>
-      <a class="act" href="#/reports?kind=out&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนส่ง</span></a>
-      <a class="act" href="#/reports?export=1">${ic('download')}<span>ส่งออกข้อมูล</span></a>
+    <div class="actions two">
+      <a class="act" href="#/reports?kind=in&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนรับ (ทั้งฉบับ)</span></a>
+      <a class="act" href="#/reports?kind=out&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนส่ง (ทั้งฉบับ)</span></a>
     </div>
     <div class="card xlcard" id="xlcard"></div>
     <div class="card"><h2>รายการล่าสุด</h2>${d.recent.length ? `<div class="tw" style="max-height:none"><table class="t"><thead><tr><th></th><th>เลขทะเบียน</th><th>ที่</th><th>ลงวันที่</th><th>เรื่อง</th><th>จาก/ถึง</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">ยังไม่มีรายการ เริ่มต้นด้วยการกด "เพิ่มหนังสือรับ" หรือ "เพิ่มหนังสือส่ง"</p>'}
@@ -141,7 +137,7 @@ const getChoice = id => { const sel = $('#' + id + '_sel'); return sel.value ===
 
 /* ---------- ฟอร์มเพิ่ม / แก้ไข ---------- */
 async function viewForm(kind, editId) {
-  const m = shell(editId ? '' : 'new/' + kind);
+  const m = shell(editId ? '' : 'list/' + kind);   // กำลังเพิ่มหนังสือรับ -> ไฮไลต์ ทะเบียนหนังสือรับ
   const edit = editId ? await api('/api/books/id/' + editId) : null;
   if (edit) kind = edit.kind;
   if (edit && edit.status === 'cancelled') { m.innerHTML = header('แก้ไขไม่ได้') + '<div class="notice err">รายการที่ยกเลิกแล้วไม่สามารถแก้ไขได้</div>'; return; }
