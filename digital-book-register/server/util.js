@@ -23,6 +23,14 @@ function thaiDate(iso, full = false) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
   return `${d} ${(full ? MONTHS : MONTHS_SHORT)[m - 1]} ${y + 543}`;
 }
+// ข้อความหมายเหตุของรายการที่ยกเลิก: "ยกเลิก (เหตุผล)" + ชื่อผู้ยกเลิก (ยศ+ชื่อ) และวันที่ แทนการลงชื่อกำกับ
+function cancelNote(b) {
+  if (b.status !== 'cancelled') return '';
+  const d = b.cancelled_at ? new Date(b.cancelled_at) : null;
+  const ds = d && !isNaN(d) ? `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}` : '';
+  const who = shortName(b.cancelled_by || '');
+  return `ยกเลิก${b.cancel_reason ? ` (${b.cancel_reason})` : ''}` + (who || ds ? `\nโดย ${[who, ds].filter(Boolean).join(' ')}` : '');
+}
 function thaiDateTime(iso) {
   if (!iso) return '';
   const date = thaiDate(iso.slice(0, 10));
@@ -41,4 +49,4 @@ class HttpError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 
-module.exports = { shortName, MONTHS, MONTHS_SHORT, pad, todayISO, nowLocal, stamp, isISODate, isLocalDateTime, thaiDate, thaiDateTime, currentBuddhistYear, formatRegNo, HttpError };
+module.exports = { cancelNote, shortName, MONTHS, MONTHS_SHORT, pad, todayISO, nowLocal, stamp, isISODate, isLocalDateTime, thaiDate, thaiDateTime, currentBuddhistYear, formatRegNo, HttpError };

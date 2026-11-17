@@ -47,7 +47,7 @@ function columnsFor(kind, withFrom) {
 function cellText(row, key) {
   if (key === 'book_date') return U.thaiDate(row.book_date);
   // รายการที่ยกเลิก: ขีดฆ่าทั้งแถว (วาดตอนพิมพ์) และเขียน "ยกเลิก (เหตุผล)" ในช่องหมายเหตุ เหมือนแก้ในสมุดทะเบียน
-  if (key === 'remark' && row.status === 'cancelled') return [`ยกเลิก${row.cancel_reason ? ` (${row.cancel_reason})` : ''}`, row.remark].filter(Boolean).join('\n');
+  if (key === 'remark' && row.status === 'cancelled') return [U.cancelNote(row), row.remark].filter(Boolean).join('\n');
   return row[key] || '';
 }
 

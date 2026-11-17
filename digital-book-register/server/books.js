@@ -272,7 +272,8 @@ function listForExport(p) {
   const { where, args } = buildWhere(p);
   const incl = p.cancelled === '0' ? "AND status='active'" : '';
   const w = where ? where + ' ' + incl : (incl ? 'WHERE 1=1 ' + incl : '');
-  return db.get().prepare(`SELECT * FROM books ${w} ORDER BY year ASC, reg_no ASC`).all(...args);
+  // cancelled_by = ผู้เข้าเวรที่กดยกเลิก (จากประวัติ) ใช้ลงชื่อกำกับในใบพิมพ์
+  return db.get().prepare(`SELECT *, (SELECT h.actor FROM history h WHERE h.book_id = books.id AND h.action = 'cancel' ORDER BY h.id DESC LIMIT 1) AS cancelled_by FROM books ${w} ORDER BY year ASC, reg_no ASC`).all(...args);
 }
 
 function dashboard() {
