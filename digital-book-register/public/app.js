@@ -3,16 +3,31 @@
 const S = { st: null };          // สถานะที่โหลดจากเซิร์ฟเวอร์ (ตั้งค่า, ฟอนต์, ปี)
 const KIND = { in: 'หนังสือรับ', out: 'หนังสือส่ง' };
 const MENU = [
-  ['dashboard', '🏠', 'Dashboard'], ['new/in', '📥', 'เพิ่มหนังสือรับ'], ['new/out', '📤', 'เพิ่มหนังสือส่ง'], ['sep'],
-  ['list/in', '📒', 'ทะเบียนหนังสือรับ'], ['list/out', '📕', 'ทะเบียนหนังสือส่ง'], ['search', '🔍', 'ค้นหาหนังสือ'],
-  ['reports', '🖨️', 'รายงานและส่งออก'], ['sep'], ['settings', '⚙️', 'ตั้งค่าระบบ'], ['backup', '💾', 'สำรองข้อมูล'],
+  ['grp', 'งานประจำวัน'], ['dashboard', 'home', 'หน้าหลัก'], ['new/in', 'inbox', 'เพิ่มหนังสือรับ'], ['new/out', 'send', 'เพิ่มหนังสือส่ง'],
+  ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['reports', 'printer', 'พิมพ์และส่งออก'],
+  ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'],
 ];
+// ฟอนต์หน้าจอ (ฝังในโปรแกรม ใช้ออฟไลน์ได้) — การพิมพ์/PDF ยังใช้ TH Sarabun เสมอ
+const UI_FONTS = [
+  { id: 'plex', label: 'IBM Plex Sans Thai Looped', tag: 'แนะนำ', css: "'IBM Plex Sans Thai Looped'", base: 17, note: 'ตัวมีหัว อ่านง่าย ดูเป็นทางการ' },
+  { id: 'sarabun', label: 'Sarabun (สารบรรณ)', css: "'Sarabun'", base: 18, note: 'หน้าตาคล้าย TH Sarabun แต่คมชัดบนจอ' },
+  { id: 'noto', label: 'Noto Sans Thai', css: "'Noto Sans Thai'", base: 17, note: 'ตัวไม่มีหัว ทันสมัย' },
+  { id: 'register', label: 'TH SarabunIT๙ (แบบเดิม)', css: "'RegisterFont'", base: 23, note: 'ฟอนต์เดียวกับที่ใช้พิมพ์ ตัวเล็กและบางกว่า' },
+];
+const UI_SCALES = [['90', 'เล็ก'], ['100', 'ปกติ'], ['112', 'ใหญ่'], ['125', 'ใหญ่มาก']];
+function applyUiFont(id, scale) {
+  const f = UI_FONTS.find(x => x.id === id) || UI_FONTS[0];
+  const r = document.documentElement.style;
+  r.setProperty('--font', `${f.css},'Leelawadee UI','Tahoma',sans-serif`);
+  r.setProperty('--fs', (f.base * (parseInt(scale, 10) || 100) / 100).toFixed(2) + 'px');
+  document.documentElement.dataset.uifont = f.id;
+}
 const debounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 async function loadState() {
   S.st = await api('/api/state');
   const s = S.st.settings, f = S.st.fonts;
-  document.documentElement.style.setProperty('--fs', (s.ui_font_size || 18) + 'px');
+  applyUiFont(s.ui_font || 'plex', s.ui_scale || '100');
   document.documentElement.style.setProperty('--ink-user', s.data_color || '#174EA6');
   let css = '';
   if (f.regular) css += `@font-face{font-family:'RegisterFont';src:url('/api/font/regular?v=${f.regular.version}');font-weight:400}`;
@@ -23,14 +38,18 @@ async function loadState() {
 /* ---------- โครงหน้า ---------- */
 function shell(active) {
   const s = S.st.settings;
-  const nav = MENU.map(([r, ic, t]) => r === 'sep' ? '<div class="sep"></div>' : `<a href="#/${r}" class="${active === r ? 'on' : ''}"><span class="ic">${ic}</span>${t}</a>`).join('');
+  const nav = MENU.map(([r, i, t]) => r === 'grp' ? `<div class="grp">${i}</div>` : `<a href="#/${r}" class="${active === r ? 'on' : ''}">${ic(i)}<span>${t}</span></a>`).join('');
+  const themeHtml = () => `${ic(Theme.isDark() ? 'sun' : 'moon')}<span>${Theme.isDark() ? 'โหมดสว่าง' : 'โหมดมืด'}</span>`;
+  const duty = getDuty();
   $('#app').innerHTML = `<div class="shell"><aside class="side">
-    <div class="brand">${s.logo ? '<img src="/api/logo?' + Date.now() + '" alt="">' : '<div class="logo">📒</div>'}<div><b>${esc(s.org_name || 'ทะเบียนหนังสือ')}</b><small>รับ–ส่ง อิเล็กทรอนิกส์</small></div></div>
+    <div class="brand">${s.logo ? '<img src="/api/logo?' + Date.now() + '" alt="">' : '<img src="/icon.svg" alt="" class="appicon">'}<div><b>${esc(s.org_name || 'ทะเบียนหนังสือ')}</b><small>รับ–ส่ง อิเล็กทรอนิกส์</small></div></div>
     <nav class="nav">${nav}</nav>
-    <div class="nav"><div class="sep"></div><a id="theme"><span class="ic">${Theme.isDark() ? '☀️' : '🌙'}</span><span>${Theme.isDark() ? 'โหมดสว่าง' : 'โหมดมืด'}</span></a><a id="quit"><span class="ic">⏻</span>ปิดโปรแกรม</a></div>
-    ${S.st.has_password ? '<div class="nav"><a id="logout"><span class="ic">🚪</span>ออกจากระบบ</a></div>' : ''}</aside>
+    <div class="side-foot">
+      ${duty ? `<a class="me" href="#/duty" title="เปลี่ยนผู้เข้าเวร"><span class="av">${esc(initialOf(duty))}</span><span class="grow"><b>${esc(shortName(duty))}</b><small>ผู้เข้าเวร · กดเพื่อเปลี่ยน</small></span></a>` : ''}
+      <div class="nav"><a id="theme">${themeHtml()}</a><a id="quit">${ic('power')}<span>ปิดโปรแกรม</span></a>
+      ${S.st.has_password ? `<a id="logout">${ic('logout')}<span>ออกจากระบบ</span></a>` : ''}</div></div></aside>
     <main class="main" id="main"></main></div>`;
-  $('#theme').onclick = () => { Theme.toggle(); $('#theme').innerHTML = `<span class="ic">${Theme.isDark() ? '☀️' : '🌙'}</span><span>${Theme.isDark() ? 'โหมดสว่าง' : 'โหมดมืด'}</span>`; };
+  $('#theme').onclick = () => { Theme.toggle(); $('#theme').innerHTML = themeHtml(); };
   $('#quit').onclick = async () => {
     if (!await confirmBox('ปิดโปรแกรม', '<p>ต้องการปิดโปรแกรมทะเบียนหนังสือหรือไม่? (ข้อมูลที่บันทึกแล้วไม่หาย)</p>', 'ปิดโปรแกรม', true)) return;
     try { await api('/api/shutdown', { method: 'POST' }); $('#app').innerHTML = '<div class="login"><div class="card" style="text-align:center"><h1 style="font-size:1.5rem">ปิดโปรแกรมเรียบร้อยแล้ว</h1><p class="muted">ปิดหน้าต่างนี้ได้เลย · เปิดใหม่โดยดับเบิลคลิกไอคอน "ทะเบียนหนังสือ" บน Desktop</p></div></div>'; } catch (e) { toast(e.message, 'err', 7000); }
@@ -43,30 +62,44 @@ function fontWarning() {
 }
 // ชื่อสั้น = ยศ+ชื่อ ตัดนามสกุลออก (คำแรกก่อนช่องว่าง) เช่น "ส.ต.ท.เนวิน แดงแจ้" -> "ส.ต.ท.เนวิน"
 const shortName = n => String(n || '').trim().split(/\s+/)[0];
+// อักษรตัวแรกของชื่อ (ข้ามยศ) ใช้ทำรูปวงกลม เช่น "ส.ต.ท.เนวิน" -> "เ" -> ใช้พยัญชนะ "น"
+const initialOf = n => { const nm = shortName(n).split('.').filter(Boolean).pop() || ''; const m = nm.match(/[ก-ฮA-Za-z]/); return m ? m[0] : '?'; };
 const getDuty = () => { try { return sessionStorage.getItem('duty') || ''; } catch { return ''; } };
 const officers = () => { try { return JSON.parse(S.st.settings.duty_officers || '[]'); } catch { return []; } };
-const header = (title, right = '') => `<div class="top"><h1>${title}</h1><div class="row"><a class="pill" href="#/duty" title="เปลี่ยนผู้เข้าเวร" style="text-decoration:none">👤 ${esc(getDuty())} ▾</a><span class="pill">ปีทะเบียน พ.ศ. ${S.st.year}</span>${right}</div></div>`;
+const header = (title, right = '', sub = '') => `<div class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="row"><span class="pill">${ic('calendar')} ปีทะเบียน พ.ศ. ${S.st.year}</span>${right}</div></div>`;
 
 /* ---------- Dashboard ---------- */
 async function viewDashboard() {
   const m = shell('dashboard'); const d = await api('/api/dashboard');
   const rows = d.recent.map(b => `<tr class="click ${b.status === 'cancelled' ? 'cancelled' : ''}" data-id="${b.id}">
-    <td><span class="tag ${b.kind}">${b.kind === 'in' ? 'รับ' : 'ส่ง'}</span></td><td class="regno">${esc(b.reg_label)}</td><td class="ink">${esc(b.book_no)}</td><td class="ink">${fmtDate(b.book_date)}</td>
+    <td><span class="tag ${b.kind}">${b.kind === 'in' ? 'รับ' : 'ส่ง'}</span></td><td class="regno">${esc(b.reg_label)}</td><td class="ink">${esc(b.book_no)}</td><td class="ink nowrap">${fmtDate(b.book_date)}</td>
     <td class="ink">${esc(b.subject)}</td><td class="ink">${esc(b.kind === 'in' ? b.from_org : b.to_org)}</td></tr>`).join('');
-  m.innerHTML = header('Dashboard') + fontWarning() + `
-    <div class="grid g4">
-      <div class="card stat"><div class="l">หนังสือรับทั้งหมด</div><div class="n">${d.in_total}</div><small class="muted">ปีนี้ ${d.in_year} · เลขถัดไป ${esc(d.next_in)}</small></div>
-      <div class="card stat out"><div class="l">หนังสือส่งทั้งหมด</div><div class="n">${d.out_total}</div><small class="muted">ปีนี้ ${d.out_year} · เลขถัดไป ${esc(d.next_out)}</small></div>
-      <div class="card stat"><div class="l">หนังสือรับประจำเดือนนี้</div><div class="n">${d.in_month}</div></div>
-      <div class="card stat out"><div class="l">หนังสือส่งประจำเดือนนี้</div><div class="n">${d.out_month}</div></div>
+  const s = S.st.settings;
+  m.innerHTML = header(`สวัสดี ${esc(shortName(getDuty()))}`, '', `${ic('clock')} <span id="today">${longToday()}</span> · <span id="clock"></span> น. &nbsp;·&nbsp; ${esc(s.duty_title)} ${esc(s.duty_unit)}`) + fontWarning() + `
+    <div class="hero">
+      <a class="tile in" href="#/new/in"><span class="tile-ic">${ic('inbox')}</span><span class="grow"><b>เพิ่มหนังสือรับ</b><small>เลขทะเบียนรับถัดไป <span class="num">${esc(d.next_in)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
+      <a class="tile out" href="#/new/out"><span class="tile-ic">${ic('send')}</span><span class="grow"><b>เพิ่มหนังสือส่ง</b><small>เลขทะเบียนส่งถัดไป <span class="num">${esc(d.next_out)}</span></small></span><span class="tile-go">${ic('plus')}</span></a>
     </div>
-    <div class="card"><div class="quick">
-      <a class="btn primary big" href="#/new/in">📥 เพิ่มหนังสือรับ</a><a class="btn primary big" href="#/new/out">📤 เพิ่มหนังสือส่ง</a>
-      <a class="btn big" href="#/search">🔍 ค้นหาหนังสือ</a><a class="btn big" href="#/reports?kind=in&scope=all&auto=1">🖨️ พิมพ์ทะเบียนรับ (ทั้งฉบับ)</a><a class="btn big" href="#/reports?kind=out&scope=all&auto=1">🖨️ พิมพ์ทะเบียนส่ง (ทั้งฉบับ)</a><a class="btn big" href="#/reports?export=1">📊 ส่งออกข้อมูล</a></div></div>
+    <div class="grid g4 stats">
+      <div class="card stat"><span class="st-ic in">${ic('inbox')}</span><div><div class="l">หนังสือรับ ปีนี้</div><div class="n">${d.in_year}</div><small class="muted">ทั้งหมด ${d.in_total}</small></div></div>
+      <div class="card stat"><span class="st-ic in">${ic('calendar')}</span><div><div class="l">หนังสือรับ เดือนนี้</div><div class="n">${d.in_month}</div></div></div>
+      <div class="card stat"><span class="st-ic out">${ic('send')}</span><div><div class="l">หนังสือส่ง ปีนี้</div><div class="n">${d.out_year}</div><small class="muted">ทั้งหมด ${d.out_total}</small></div></div>
+      <div class="card stat"><span class="st-ic out">${ic('calendar')}</span><div><div class="l">หนังสือส่ง เดือนนี้</div><div class="n">${d.out_month}</div></div></div>
+    </div>
+    <div class="actions">
+      <a class="act" href="#/search">${ic('search')}<span>ค้นหาหนังสือ</span></a>
+      <a class="act" href="#/list/in">${ic('book')}<span>ทะเบียนรับ</span></a>
+      <a class="act" href="#/list/out">${ic('book')}<span>ทะเบียนส่ง</span></a>
+      <a class="act" href="#/reports?kind=in&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนรับ</span></a>
+      <a class="act" href="#/reports?kind=out&scope=all&auto=1">${ic('printer')}<span>พิมพ์ทะเบียนส่ง</span></a>
+      <a class="act" href="#/reports?export=1">${ic('download')}<span>ส่งออกข้อมูล</span></a>
+    </div>
     <div class="card xlcard" id="xlcard"></div>
     <div class="card"><h2>รายการล่าสุด</h2>${d.recent.length ? `<div class="tw" style="max-height:none"><table class="t"><thead><tr><th></th><th>เลขทะเบียน</th><th>ที่</th><th>ลงวันที่</th><th>เรื่อง</th><th>จาก/ถึง</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">ยังไม่มีรายการ เริ่มต้นด้วยการกด "เพิ่มหนังสือรับ" หรือ "เพิ่มหนังสือส่ง"</p>'}
     ${d.cancelled ? `<p class="muted">รายการที่ยกเลิก (ยังเก็บเลขทะเบียนไว้): ${d.cancelled} รายการ</p>` : ''}</div>`;
   $$('tr.click', m).forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id));
+  const tick = () => { const c = $('#clock'); if (!c) return clearInterval(clk); const n = new Date(); c.textContent = `${p2(n.getHours())}:${p2(n.getMinutes())}`; $('#today').textContent = longToday(); };
+  const clk = setInterval(tick, 15000); tick();
   liveExcelCard($('#xlcard'));
 }
 
@@ -82,13 +115,13 @@ function downloadAllXlsx() {
 async function liveExcelCard(el) {
   const s = await api('/api/live-excel').catch(() => null); if (!s || !el.isConnected) return;
   const local = S.st.is_local;
-  el.innerHTML = `<div class="xlhead"><div class="xlicon">📊</div><div class="grow"><h2 style="margin:0">ไฟล์ Excel อัปเดตอัตโนมัติ</h2>
+  el.innerHTML = `<div class="xlhead"><div class="xlicon">${ic('sheet')}</div><div class="grow"><h2 style="margin:0">ไฟล์ Excel อัปเดตอัตโนมัติ</h2>
       <div class="muted" style="font-size:.92rem">${s.enabled ? 'บันทึกรายการเมื่อไร ไฟล์ Excel จะเพิ่มรายการต่อท้ายให้ทันที (ทะเบียนรับ + ทะเบียนส่ง คนละแผ่นงาน)' : 'ปิดอยู่ — เปิดได้ที่หน้า "สำรองข้อมูล"'}</div></div>
       ${s.enabled ? `<span class="xlstate ${s.error ? 'bad' : 'good'}">${s.error ? '⚠️ ยังไม่อัปเดต' : s.at ? '✅ อัปเดตแล้ว ' + fmtStamp(s.at) : '⏳ กำลังเตรียมไฟล์'}</span>` : ''}</div>
     ${s.error ? `<div class="notice warn" style="margin-top:10px">${esc(s.error)}</div>` : ''}${s.warn2 ? `<div class="notice warn" style="margin-top:10px">${esc(s.warn2)}</div>` : ''}
     ${s.enabled ? `<div class="muted xlpath">📄 ${esc(s.file)}${s.copy2 ? '<br>📄 สำเนา: ' + esc(s.copy2) : ''}</div>` : ''}
-    <div class="row" style="margin-top:10px">${local && s.enabled ? '<button class="btn primary" id="xlopen">📂 เปิดไฟล์ Excel</button><button class="btn" id="xlfolder">📁 เปิดโฟลเดอร์</button>' : ''}
-      <button class="btn" id="xldl">⬇ ส่งออก Excel (รับ+ส่ง ทั้งหมด)</button>${s.enabled ? '<button class="btn" id="xlnow">🔄 อัปเดตตอนนี้</button>' : ''}</div>`;
+    <div class="row" style="margin-top:10px">${local && s.enabled ? `<button class="btn primary" id="xlopen">${ic('sheet')} เปิดไฟล์ Excel</button><button class="btn" id="xlfolder">${ic('folder')} เปิดโฟลเดอร์</button>` : ''}
+      <button class="btn" id="xldl">${ic('download')} ส่งออก Excel (รับ+ส่ง ทั้งหมด)</button>${s.enabled ? `<button class="btn" id="xlnow">${ic('refresh')} อัปเดตตอนนี้</button>` : ''}</div>`;
   const open = folder => async () => { try { await api('/api/live-excel/open', { json: { folder } }); toast(folder ? 'เปิดโฟลเดอร์แล้ว' : 'กำลังเปิดไฟล์ใน Excel… (ถ้าเปิดค้างไว้ ระบบจะอัปเดตไม่ได้จนกว่าจะปิด)', 'ok', 6000); } catch (e) { toast(e.message, 'err', 7000); } };
   if ($('#xlopen', el)) { $('#xlopen', el).onclick = open(false); $('#xlfolder', el).onclick = open(true); }
   $('#xldl', el).onclick = downloadAllXlsx;
@@ -131,7 +164,7 @@ async function viewForm(kind, editId) {
   const recvOptions = [...new Set(officers().map(shortName))];
   const recvCur = edit ? shortName(edit.receiver_name || edit.action) : shortName(getDuty());
   if (recvCur && !recvOptions.includes(recvCur)) recvOptions.push(recvCur);
-  const sigBlock = who => `<div class="sigbox"><h3>👤 ผู้รับหนังสือ / ผู้บันทึก</h3>
+  const sigBlock = who => `<div class="sigbox"><div class="sec" style="margin-top:0"><span>2</span>ผู้รับหนังสือ / ผู้บันทึก</div>
     <div class="grid g2"><div class="field"><label class="f">ชื่อ <small>(ลงช่อง "การปฏิบัติ" ในทะเบียน · ยศ+ชื่อ ไม่มีนามสกุล)</small></label>
       <select id="${who}_name" class="ink"><option value="">— เลือก —</option>${recvOptions.map(n => `<option value="${esc(n)}" ${n === recvCur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
     <div class="field"><label class="f">วันและเวลา${who === 'sender' ? 'ส่ง' : 'รับ'}</label><div class="row"><div class="grow" id="${who}_at_date"></div><span class="timesel"><select id="${who}_hh" class="ink" aria-label="ชั่วโมง"><option value="">--</option>${Array.from({ length: 24 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><b>:</b><select id="${who}_mm" class="ink" aria-label="นาที"><option value="">--</option>${Array.from({ length: 60 }, (_, i) => `<option>${p2(i)}</option>`).join('')}</select><small class="muted">น.</small></span><button type="button" class="btn sm" id="${who}_now">ตอนนี้</button></div></div></div></div>`;
@@ -139,6 +172,7 @@ async function viewForm(kind, editId) {
     <form class="card" id="f" autocomplete="off">
       <div class="regbox"><div>เลขทะเบียน${isIn ? 'รับ' : 'ส่ง'}</div><b>${edit ? esc(edit.reg_label) : esc(next.label)}</b>
         <small class="muted">${edit ? 'เลขทะเบียนแก้ไขไม่ได้' : 'ระบบออกเลขให้อัตโนมัติเมื่อกดบันทึก (เลขจริงอาจเปลี่ยนถ้ามีเครื่องอื่นบันทึกก่อน)'} · ไม่ใช่เลขที่หนังสือราชการ</small></div>
+      <div class="sec"><span>1</span>ข้อมูลหนังสือ <small>เรียงตามช่องในทะเบียน</small></div>
       <div class="grid g2"><div class="field"><label class="f">ที่ <small>(เลือกตัวนำหน้า แล้วพิมพ์เฉพาะเลขหลัง / )</small></label>
           <div style="display:flex;gap:8px"><select id="book_pre" class="ink" style="flex:3 1 0;min-width:0">${prefixes.map(x => `<option value="${esc(x)}" ${x === preSel ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__custom" ${preSel === '__custom' ? 'selected' : ''}>✏️ พิมพ์เลขที่เอง (พิมพ์ทั้งหมด ไม่ใช้ตัวนำหน้า)</option></select>
             <input type="text" id="book_suf" class="ink" style="flex:1 1 0;min-width:96px" value="${esc(sufVal)}" maxlength="200"></div></div>
@@ -148,12 +182,13 @@ async function viewForm(kind, editId) {
       <div class="field"><label class="f">เรื่อง <span class="muted">*</span></label><textarea id="subject" class="ink" maxlength="1000">${v('subject')}</textarea></div>
       <div class="field"><label class="f">หมายเหตุ</label><input type="text" id="remark" class="ink" value="${v('remark')}"></div>
       <div class="grid">${sigBlock('receiver')}</div>
-      <div class="field"><label class="f">แนบไฟล์ <small>(PDF, JPG, PNG — ไม่เกิน 20 MB ต่อไฟล์)</small></label>
+      <div class="sec"><span>3</span>แนบไฟล์ <small>ไม่บังคับ · PDF, JPG, PNG ไม่เกิน 20 MB ต่อไฟล์</small></div>
+      <div class="field">
         <input type="file" id="files" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
         <div id="existing_att">${edit ? edit.attachments.map(a => `<div class="att" data-aid="${a.id}"><a href="/api/attachments/${a.id}" target="_blank">📎 ${esc(a.filename)}</a><small class="muted">${fmtSize(a.size)}</small><button type="button" class="btn sm danger" data-rm="${a.id}">ลบ</button></div>`).join('') : ''}</div></div>
       ${dl('receiver_name')}
-      <div class="row" style="margin-top:14px"><button class="btn primary big" id="save" type="submit">💾 บันทึก${edit ? 'การแก้ไข' : ''}</button>
-        <a class="btn big" href="#/${edit ? 'list/' + kind : 'dashboard'}">ยกเลิก</a><span class="muted" id="msg"></span></div>
+      <div class="savebar"><span class="muted grow" id="msg">กด <kbd>Ctrl</kbd>+<kbd>S</kbd> เพื่อบันทึกได้</span><a class="btn big" href="#/${edit ? 'list/' + kind : 'dashboard'}">ยกเลิก</a>
+        <button class="btn primary big" id="save" type="submit">${ic('save')} บันทึก${edit ? 'การแก้ไข' : ''}</button></div>
     </form>`;
 
   const bd = thaiDatePicker(edit ? edit.book_date : '');
@@ -398,17 +433,22 @@ async function viewSettings() {
     <div class="tw" style="max-height:none"><table class="t"><thead><tr><th>ชุดเลข</th><th>ปี พ.ศ.</th><th>เลขถัดไป</th><th>ตั้งเลขถัดไปใหม่</th></tr></thead><tbody>${counters.map(c => `<tr><td>${c.kind === 'in' ? 'ทะเบียนรับ' : 'ทะเบียนส่ง'}</td><td>${c.year}</td><td class="regno">${esc(c.next_label)}</td>
       <td><div class="row"><input type="number" min="1" style="width:110px" data-nk="${c.kind}" data-ny="${c.year}" value="${c.next_no}"><button class="btn sm" data-setnext="${c.kind}:${c.year}">ตั้งค่า</button></div></td></tr>`).join('')}</tbody></table></div>
     <p class="muted">ตั้งเลขถัดไปได้เฉพาะเลขที่สูงกว่าเลขที่เคยใช้แล้ว (รวมรายการที่ยกเลิก) เพื่อป้องกันเลขซ้ำ — เมื่อขึ้นปีใหม่ เลขจะเริ่มต้นใหม่ตามเลขเริ่มต้นข้างต้น</p></div>
-  <div class="card"><h2>ฟอนต์และสีตัวอักษร</h2>
+  <div class="card"><h2>ฟอนต์และขนาดตัวอักษรบนหน้าจอ</h2><p class="muted" style="margin-top:-4px">ใช้แสดงผลบนหน้าจอเท่านั้น (ฝังในโปรแกรม ไม่ต้องติดตั้ง) · การพิมพ์ทะเบียน/PDF ยังใช้ TH Sarabun ตามแบบฟอร์มราชการ · เลือกแล้วเห็นผลทันที</p>
+    <div class="fontpick">${UI_FONTS.filter(x => x.id !== 'register' || f.regular).map(x => `<label class="fp"><input type="radio" name="ui_font" value="${x.id}" ${(s.ui_font || 'plex') === x.id ? 'checked' : ''}>
+      <span class="fp-head"><b>${x.label}</b>${x.tag ? `<span class="le-badge">${x.tag}</span>` : ''}</span>
+      <span class="fp-sample" style="font-family:${x.css},sans-serif;font-size:${(x.base / 17).toFixed(2)}em">ทะเบียนหนังสือรับ ที่ นร ๕๑๑๙.๑/๑๕๐๔ ลงวันที่ ๑๗ พ.ย. ๒๕๖๙</span>
+      <small class="muted">${x.note}</small></label>`).join('')}</div>
+    <div class="field" style="margin-top:14px"><label class="f">ขนาดตัวอักษร</label><div class="seg">${UI_SCALES.map(([v, t]) => `<label><input type="radio" name="ui_scale" value="${v}" ${(s.ui_scale || '100') === v ? 'checked' : ''}>${t}</label>`).join('')}</div></div></div>
+  <div class="card"><h2>ฟอนต์สำหรับพิมพ์ (TH Sarabun) และสีตัวอักษร</h2>
     ${fontRow('regular', 'ไฟล์ฟอนต์ปกติ (เช่น THSarabunNew.ttf)')}${fontRow('bold', 'ไฟล์ฟอนต์ตัวหนา (เช่น THSarabunNew Bold.ttf — ไม่บังคับ)')}
-    <div class="grid g3"><div class="field"><label class="f">ขนาดตัวอักษรบนหน้าจอ (px)</label><input type="number" id="ui_font_size" min="12" max="28" value="${esc(s.ui_font_size)}"></div>
-      <div class="field"><label class="f">ขนาดตัวอักษรเมื่อพิมพ์ (pt)</label><input type="number" id="print_font_size" min="8" max="24" value="${esc(s.print_font_size)}"></div>
+    <div class="grid g2"><div class="field"><label class="f">ขนาดตัวอักษรเมื่อพิมพ์ (pt)</label><input type="number" id="print_font_size" min="8" max="24" value="${esc(s.print_font_size)}"></div>
       <div class="field"><label class="f">สีตัวอักษรข้อมูลที่กรอก</label><div class="row"><input type="color" id="data_color" value="${esc(s.data_color)}" style="width:60px;padding:2px"><span class="muted">ค่าตั้งต้น #174EA6 (น้ำเงินหมึกปากกา)</span></div></div></div></div>
   <div class="card"><h2>ความปลอดภัย</h2><p class="muted">${S.st.has_password ? 'ตั้งรหัสผ่านเข้าใช้งานไว้แล้ว' : 'ยังไม่ได้ตั้งรหัสผ่านเข้าใช้งาน (แนะนำให้ตั้ง โดยเฉพาะเมื่อให้เครื่องอื่นใช้งานร่วมกัน)'}</p>
     <div class="grid g3">${S.st.has_password ? '<div class="field"><label class="f">รหัสผ่านปัจจุบัน</label><input type="password" id="pw_cur" autocomplete="off"></div>' : ''}
     <div class="field"><label class="f">รหัสผ่านใหม่ ${S.st.has_password ? '<small>(เว้นว่างเพื่อลบรหัสผ่าน)</small>' : ''}</label><input type="password" id="pw_new" autocomplete="new-password"></div>
     <div class="field"><label class="f">&nbsp;</label><button class="btn" id="pw_save">บันทึกรหัสผ่าน</button></div></div>
     <p class="muted" style="font-size:.9rem">ข้อมูลทั้งหมดเก็บที่: <code>${esc(S.st.data_dir)}</code> (ไฟล์แนบเข้าถึงได้ผ่านโปรแกรมเท่านั้น ไม่ได้อยู่ในโฟลเดอร์สาธารณะ)</p></div>
-  <div class="savebar"><span class="muted" id="dirty"></span><button class="btn primary big" id="save">💾 บันทึกการตั้งค่า</button></div>`;
+  <div class="savebar"><span class="muted grow" id="dirty"></span><button class="btn primary big" id="save">${ic('save')} บันทึกการตั้งค่า</button></div>`;
   const jl = k => { try { return JSON.parse(s[k] || '[]'); } catch { return []; } };
   const markDirty = () => { $('#dirty').textContent = '● มีการเปลี่ยนแปลงที่ยังไม่บันทึก'; };
   const LE = {
@@ -417,6 +457,7 @@ async function viewSettings() {
     from_options: listEditor($('#from_options'), jl('from_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }),
     to_options: listEditor($('#to_options'), jl('to_options'), { ph: 'เพิ่มหน่วยงาน', onChange: markDirty }) };
   $$('.card input:not(.le-new), .card select', m).forEach(i => i.addEventListener('input', markDirty));
+  $$('[name=ui_font],[name=ui_scale]', m).forEach(r => r.addEventListener('change', () => applyUiFont(($('[name=ui_font]:checked') || {}).value, $('[name=ui_scale]:checked').value)));
   const ym = /^\d{4}$/.test(s.year_mode); $('#year_mode').value = ym ? 'manual' : (s.year_mode === 'auto' ? 'auto' : 'fiscal'); $('#year_val').value = ym ? s.year_mode : ''; $('#year_val').hidden = !ym;
   $('#year_mode').onchange = () => { $('#year_val').hidden = $('#year_mode').value !== 'manual'; if (!$('#year_val').hidden && !$('#year_val').value) $('#year_val').value = S.st.year; };
   $('#save').onclick = async () => {
@@ -424,7 +465,7 @@ async function viewSettings() {
     if (!LE.duty_officers.get().length) { toast('ต้องมีผู้เข้าเวรอย่างน้อย 1 คน', 'err'); return; }
     try {
       await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : g('year_mode'), from_options: g('from_options'), to_options: g('to_options'), book_no_prefixes: g('book_no_prefixes'), reg_format: g('reg_format'), reg_pad: g('reg_pad'),
-        start_in: g('start_in'), start_out: g('start_out'), ui_font_size: g('ui_font_size'), print_font_size: g('print_font_size'), data_color: g('data_color') } });
+        start_in: g('start_in'), start_out: g('start_out'), ui_font: $('[name=ui_font]:checked') ? $('[name=ui_font]:checked').value : 'plex', ui_scale: $('[name=ui_scale]:checked').value, print_font_size: g('print_font_size'), data_color: g('data_color') } });
       toast('บันทึกการตั้งค่าเรียบร้อย', 'ok'); await loadState(); viewSettings();
     } catch (e) { toast(e.message, 'err', 7000); }
   };
@@ -567,12 +608,12 @@ function viewLogin() {
 /* ---------- หน้าแรก: เลือกผู้เข้าเวร ---------- */
 function viewDuty() {
   const s = S.st.settings; const list = officers();
-  $('#app').innerHTML = `<div class="login" style="max-width:560px"><div class="card" style="text-align:center">
-    ${s.logo ? '<img src="/api/logo" alt="" style="height:70px;margin-bottom:6px">' : ''}
-    <h1 style="font-size:1.7rem">${esc(s.duty_title)}</h1><p style="font-size:1.2rem;margin:0 0 4px;color:var(--navy)"><b>${esc(s.duty_unit)}</b></p>
-    <p class="muted">กรุณาเลือกชื่อผู้เข้าเวรที่กำลังบันทึกทะเบียนหนังสือ</p>
-    <div style="display:grid;gap:10px;margin:14px 0">${list.map((n, i) => `<button class="btn primary big" data-i="${i}">👤 ${esc(n)}</button>`).join('') || '<div class="notice warn">ยังไม่มีรายชื่อผู้เข้าเวร</div>'}</div>
-    <a href="#/settings" class="muted">⚙️ ตั้งค่ารายชื่อผู้เข้าเวร</a></div></div>`;
+  $('#app').innerHTML = `<div class="welcome"><div class="welcome-card">
+    <img src="${s.logo ? '/api/logo' : '/icon.svg'}" alt="" class="welcome-logo">
+    <h1>${esc(s.duty_title)}</h1><p class="unit">${esc(s.duty_unit)}</p>
+    <p class="muted" style="margin:6px 0 0">${longToday()} · เลือกชื่อผู้เข้าเวรที่กำลังบันทึกทะเบียนหนังสือ</p>
+    <div class="officers">${list.map((n, i) => `<button class="officer" data-i="${i}"><span class="av">${esc(initialOf(n))}</span><span class="grow"><b>${esc(shortName(n))}</b><small>${esc(n)}</small></span>${ic('right')}</button>`).join('') || '<div class="notice warn">ยังไม่มีรายชื่อผู้เข้าเวร</div>'}</div>
+    <a href="#/settings" class="muted small-link">${ic('sliders')} ตั้งค่ารายชื่อผู้เข้าเวร</a></div></div>`;
   $('#app').append(themeButton());
   $$('[data-i]').forEach(b => b.onclick = () => { try { sessionStorage.setItem('duty', list[+b.dataset.i]); } catch { /* ignore */ } if (location.hash === '#/dashboard') route(); else location.hash = '#/dashboard'; });
 }
@@ -603,4 +644,6 @@ async function boot() {
   route();
 }
 window.addEventListener('hashchange', () => route());
+// Ctrl+S = กดปุ่มบันทึกของหน้านั้น
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { const b = $('#main #save'); if (b) { e.preventDefault(); b.click(); } } });
 boot();

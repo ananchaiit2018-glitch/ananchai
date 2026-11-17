@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F6FDE"/>
+      <stop offset="1" stop-color="#10234A"/>
+    </linearGradient>
+    <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E4ECFA"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD25A"/>
+      <stop offset="1" stop-color="#F0A500"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="120" rx="56" fill="#fff" opacity=".06"/>
+  <!-- open register book -->
+  <path d="M128 70 C108 58 74 54 44 60 V190 C74 184 108 188 128 200 Z" fill="url(#pg)"/>
+  <path d="M128 70 C148 58 182 54 212 60 V190 C182 184 148 188 128 200 Z" fill="url(#pg)"/>
+  <path d="M128 70 V200" stroke="#9DB3D9" stroke-width="3"/>
+  <!-- ruled lines (left page) -->
+  <g stroke="#2F6FDE" stroke-width="6" stroke-linecap="round" opacity=".85">
+    <path d="M60 92 C80 89 100 90 114 95"/>
+    <path d="M60 116 C80 113 100 114 114 119"/>
+    <path d="M60 140 C80 137 100 138 114 143"/>
+    <path d="M60 164 C80 161 96 162 106 165"/>
+  </g>
+  <!-- ruled lines (right page) -->
+  <g stroke="#9DB3D9" stroke-width="6" stroke-linecap="round">
+    <path d="M142 95 C156 90 176 89 196 92"/>
+    <path d="M142 119 C156 114 176 113 196 116"/>
+  </g>
+  <!-- in/out badge -->
+  <circle cx="178" cy="166" r="38" fill="url(#gold)" stroke="#fff" stroke-width="7"/>
+  <path d="M160 158 H194 M184 148 L194 158 L184 168" fill="none" stroke="#10234A" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M196 176 H162 M172 166 L162 176 L172 186" fill="none" stroke="#10234A" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

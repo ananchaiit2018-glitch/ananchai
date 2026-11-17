@@ -88,7 +88,9 @@ function createApp() {
     }
     const num = (k, lo, hi, label) => { if (b[k] !== undefined) { const n = parseInt(b[k], 10); if (!(n >= lo && n <= hi)) throw new U.HttpError(400, `${label} ต้องอยู่ระหว่าง ${lo}-${hi}`); out[k] = String(n); } };
     num('reg_pad', 0, 8, 'จำนวนหลักเลขทะเบียน'); num('start_in', 1, 999999, 'เลขเริ่มต้นทะเบียนรับ'); num('start_out', 1, 999999, 'เลขเริ่มต้นทะเบียนส่ง');
-    num('ui_font_size', 12, 28, 'ขนาดตัวอักษรหน้าจอ'); num('print_font_size', 8, 24, 'ขนาดตัวอักษรพิมพ์');
+    num('ui_font_size', 12, 28, 'ขนาดตัวอักษรหน้าจอ');
+    if (b.ui_font !== undefined) { if (!['plex', 'sarabun', 'noto', 'register'].includes(b.ui_font)) throw new U.HttpError(400, 'ฟอนต์หน้าจอไม่ถูกต้อง'); out.ui_font = b.ui_font; }
+    if (b.ui_scale !== undefined) { if (!['90', '100', '112', '125'].includes(String(b.ui_scale))) throw new U.HttpError(400, 'ขนาดตัวอักษรไม่ถูกต้อง'); out.ui_scale = String(b.ui_scale); } num('print_font_size', 8, 24, 'ขนาดตัวอักษรพิมพ์');
     if (b.data_color !== undefined) { if (!/^#[0-9a-fA-F]{6}$/.test(b.data_color)) throw new U.HttpError(400, 'รหัสสีไม่ถูกต้อง เช่น #174EA6'); out.data_color = b.data_color.toUpperCase(); }
     if (b.auto_backup !== undefined) out.auto_backup = b.auto_backup ? '1' : '0';
     if (b.backup_every_hours !== undefined) { const n = parseInt(b.backup_every_hours, 10); if (![1, 3, 6, 12, 24, 72, 168].includes(n)) throw new U.HttpError(400, 'ความถี่การสำรองไม่ถูกต้อง'); out.backup_every_hours = String(n); }

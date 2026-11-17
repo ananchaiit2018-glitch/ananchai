@@ -106,7 +106,9 @@ const DEFAULTS = {
   reg_pad: '3',
   start_in: '1',
   start_out: '1',
-  ui_font_size: '24',
+  ui_font_size: '24',        // (เดิม) ใช้เมื่อเลือกฟอนต์ TH SarabunIT๙
+  ui_font: 'plex',           // ฟอนต์หน้าจอ: plex / sarabun / noto / register
+  ui_scale: '100',           // ขนาดตัวอักษรหน้าจอ (%)
   print_font_size: '16',
   data_color: '#174EA6',
   logo: '',

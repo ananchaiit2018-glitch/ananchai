@@ -24,8 +24,8 @@ call npm install --omit=dev
 if errorlevel 1 ( echo [ผิดพลาด] ติดตั้งไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต & pause & exit /b 1 )
 
 :shortcut
-echo กำลังสร้างไอคอนบน Desktop...
-powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\ทะเบียนหนังสือ.lnk'); $s.TargetPath='%~dp0start-hidden.vbs'; $s.WorkingDirectory='%~dp0'; $s.Save()"
+echo กำลังสร้างไอคอนบน Desktop และใน Start Menu...
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\ทะเบียนหนังสือ.lnk'); $s.TargetPath='%~dp0start-hidden.vbs'; $s.WorkingDirectory='%~dp0'; $s.IconLocation='%~dp0app.ico,0'; $s.Description='ระบบทะเบียนหนังสือรับ-ส่ง'; $s.Save(); $m=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Programs')+'\ทะเบียนหนังสือ.lnk'); $m.TargetPath=$s.TargetPath; $m.WorkingDirectory=$s.WorkingDirectory; $m.IconLocation=$s.IconLocation; $m.Description=$s.Description; $m.Save()"
 echo.
 echo ติดตั้งเสร็จแล้ว ดับเบิลคลิกไอคอน "ทะเบียนหนังสือ" บน Desktop เพื่อเปิดโปรแกรม
 pause
