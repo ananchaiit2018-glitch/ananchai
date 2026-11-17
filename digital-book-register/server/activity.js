@@ -12,13 +12,13 @@ const ACTIONS = {
   attach_add: 'แนบไฟล์', attach_remove: 'ลบไฟล์แนบ',
   print: 'สั่งพิมพ์', export: 'โหลดไฟล์ออก',
   settings: 'แก้ตั้งค่า', counters: 'ตั้งเลขทะเบียนใหม่', password: 'เปลี่ยนรหัสผ่าน', font: 'เปลี่ยนฟอนต์', logo: 'เปลี่ยนโลโก้',
-  backup: 'สำรองข้อมูล', backup_auto: 'สำรองอัตโนมัติ', restore: 'กู้ข้อมูลคืน',
+  backup: 'สำรองข้อมูล', backup_auto: 'สำรองอัตโนมัติ', restore: 'กู้ข้อมูลคืน', reset: 'เริ่มต้นใหม่ (ล้างข้อมูล)',
 };
 const GROUPS = {
   access: { label: 'เปิดโปรแกรม / เข้าเวร', actions: ['app_start', 'app_stop', 'login', 'login_fail', 'logout', 'duty_start', 'duty_change'] },
   register: { label: 'ลงทะเบียนหนังสือ', actions: ['book_create', 'book_update', 'book_cancel', 'attach_add', 'attach_remove'] },
   output: { label: 'พิมพ์ / โหลดไฟล์', actions: ['print', 'export'] },
-  system: { label: 'ตั้งค่า / สำรองข้อมูล', actions: ['settings', 'counters', 'password', 'font', 'logo', 'backup', 'backup_auto', 'restore'] },
+  system: { label: 'ตั้งค่า / สำรองข้อมูล', actions: ['settings', 'counters', 'password', 'font', 'logo', 'backup', 'backup_auto', 'restore', 'reset'] },
 };
 
 const SCHEMA = `

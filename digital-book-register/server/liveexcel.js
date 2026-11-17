@@ -28,6 +28,7 @@ async function write() {
   try {
     if (!enabled() && !archive.enabled()) return status();
     const dir = archive.archiveDir(); st.dir = dir; const errs = [];
+    const own = archive.claim(dir); if (!own.ok) { st.error = own.error; return status(); }   // โฟลเดอร์ของชุดเดิม: ไม่แตะ
     // 1) จัดไฟล์หนังสือลงโฟลเดอร์ หนังสือรับ/หนังสือส่ง แยกตามวัน
     let links = null;
     if (archive.enabled()) {

@@ -16,6 +16,7 @@ const fsb = require('./fsbrowse');
 const isLocal = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 const ctx = require('./context');
 const activity = require('./activity');
+const resetMod = require('./reset');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 10 } });
 const uploadBig = multer({ dest: path.join(cfg.DATA_DIR, '.uploads'), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
@@ -74,6 +75,7 @@ function createApp() {
     ['POST', /^\/api\/backup\/run$/, (q, b) => ['backup', b && b.ok ? `${b.name}${b.excel ? ' + ' + b.excel : ''}` : `ไม่สำเร็จ ${(b && b.error) || ''}`]],
     ['POST', /^\/api\/backup\/restore(-local)?$/, q => ['restore', (q.body && q.body.name) || (q.file && fixName(q.file.originalname)) || 'จากไฟล์ที่เลือก']],
     ['POST', /^\/api\/shutdown$/, () => ['app_stop', 'กดปุ่มปิดโปรแกรม']],
+    ['POST', /^\/api\/reset$/, (q, b) => b && b.ok ? ['reset', `ล้างข้อมูลแล้ว · สำรองข้อมูลชุดเดิมไว้ที่ ${b.backup_dir}${path.sep}${b.backup}`] : null],
   ];
   app.use((req, res, next) => {
     const rule = RULES.find(r => r[0] === req.method && r[1].test(req.path)); if (!rule) return next();
@@ -152,6 +154,7 @@ function createApp() {
     if (b.backup_excel !== undefined) out.backup_excel = b.backup_excel ? '1' : '0';
     if (b.live_excel !== undefined) out.live_excel = b.live_excel ? '1' : '0';
     if (b.archive_on !== undefined) out.archive_on = b.archive_on ? '1' : '0';
+    if (b.fresh_start !== undefined) out.fresh_start = b.fresh_start === '1' ? '1' : '0';
     if (b.archive_dir !== undefined) {
       const v = String(b.archive_dir).trim();
       if (v) { try { fs.mkdirSync(v, { recursive: true }); fs.accessSync(v, fs.constants.W_OK); } catch { throw new U.HttpError(400, 'เขียนไฟล์ในโฟลเดอร์นี้ไม่ได้ ตรวจสอบตำแหน่ง/ไดรฟ์อีกครั้ง'); } }
@@ -250,6 +253,16 @@ function createApp() {
     if (req.params.fmt === 'xlsx') return send(res, await exp.makeXlsx(q), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', base, '.xlsx', true);
     if (req.params.fmt === 'csv') return send(res, exp.makeCsv(q), 'text/csv; charset=utf-8', base, '.csv', true);
     throw new U.HttpError(400, 'รูปแบบไฟล์ไม่ถูกต้อง');
+  }));
+
+  /* --- เริ่มต้นใหม่ (รีเซ็ต) — เฉพาะเครื่องหลัก --- */
+  app.get('/api/reset/info', wrap((req, res) => res.json(resetMod.info())));
+  app.post('/api/reset', wrap(async (req, res) => {
+    if (!isLocal(req)) throw new U.HttpError(403, 'เริ่มต้นใหม่ได้เฉพาะที่เครื่องหลักเท่านั้น');
+    const q = req.body || {};
+    if (String(q.confirm || '').trim() !== 'เริ่มใหม่') throw new U.HttpError(400, 'พิมพ์คำว่า เริ่มใหม่ เพื่อยืนยัน');
+    if (!auth.checkPassword(q.password)) throw new U.HttpError(403, 'รหัสผ่านไม่ถูกต้อง');
+    const r = await resetMod.run(); live.schedule(300); res.json(r);
   }));
 
   /* --- บันทึกการใช้งาน --- */

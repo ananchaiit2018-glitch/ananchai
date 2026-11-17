@@ -488,7 +488,12 @@ async function viewSettings() {
   const counters = await api('/api/counters'); const cy = S.st.year;
   const fontRow = (k, label) => `<div class="field"><label class="f">${label}</label>${f[k] ? `<div class="notice ok">ใช้ไฟล์: <b>${esc(f[k].file)}</b> — ชื่อฟอนต์จากไฟล์: <b>${esc(f[k].full || f[k].family)}</b> (${fmtSize(f[k].size)})</div>` : '<div class="notice warn">ยังไม่ได้นำเข้า</div>'}
     <div class="row"><input type="file" data-font="${k}" accept=".ttf,.otf,.woff"><button class="btn sm danger" data-fontdel="${k}" ${f[k] ? '' : 'hidden'}>ลบฟอนต์</button></div></div>`;
-  m.innerHTML = header('ตั้งค่าระบบ') + fontWarning() + `
+  const fresh = s.fresh_start === '1' ? `<div class="card fresh"><h2>${ic('sliders')} เริ่มต้นใหม่แล้ว — ตั้งค่าหน่วยใหม่ตามนี้</h2><ol>
+      <li><b>ผู้เข้าเวร</b>: หัวข้อ หน่วยที่ประจำ และรายชื่อ (ด้านล่าง)</li><li><b>ตัวนำหน้า "ที่"</b> และ <b>จาก / ถึง</b> ของหน่วยใหม่</li>
+      <li><b>ข้อมูลหน่วยงาน</b> ชื่อหน่วย / โลโก้</li><li><b>ต่อเลขจากสมุด</b> ถ้ามีสมุดทะเบียนเดิม (การ์ดเลขทะเบียน)</li>
+      <li><b>โฟลเดอร์เก็บหนังสือ</b> เลือกโฟลเดอร์ใหม่ที่หน้า <a href="#/backup">สำรองข้อมูล</a> (โฟลเดอร์ของชุดเดิมโปรแกรมจะไม่แตะ)</li><li><b>รหัสผ่าน</b> (ถ้าต้องการ)</li></ol>
+      <p class="muted" style="margin:0">ทำเสร็จแล้วกด <b>บันทึกการตั้งค่า</b> ข้อความนี้จะหายไป</p></div>` : '';
+  m.innerHTML = header('ตั้งค่าระบบ') + fontWarning() + fresh + `
   <div class="card"><h2>ผู้เข้าเวร (หน้าแรก)</h2><div class="grid g2">
     <div class="field"><label class="f">หัวข้อหน้าแรก</label><input type="text" id="duty_title" value="${esc(s.duty_title)}"></div>
     <div class="field"><label class="f">หน่วยที่ประจำ</label><input type="text" id="duty_unit" value="${esc(s.duty_unit)}"></div></div>
@@ -537,6 +542,11 @@ async function viewSettings() {
     <div class="field"><label class="f">รหัสผ่านใหม่ ${S.st.has_password ? '<small>(เว้นว่างเพื่อลบรหัสผ่าน)</small>' : ''}</label><input type="password" id="pw_new" autocomplete="new-password"></div>
     <div class="field"><label class="f">&nbsp;</label><button class="btn" id="pw_save">บันทึกรหัสผ่าน</button></div></div>
     <p class="muted" style="font-size:.9rem">ข้อมูลทั้งหมดเก็บที่: <code>${esc(S.st.data_dir)}</code> (ไฟล์แนบเข้าถึงได้ผ่านโปรแกรมเท่านั้น ไม่ได้อยู่ในโฟลเดอร์สาธารณะ)</p></div>
+  <div class="card dz"><h2>${ic('refresh')} เริ่มต้นใหม่ (ล้างข้อมูล)</h2>
+    <p class="muted" style="margin-top:-4px">ใช้เมื่อย้ายหน่วย / ส่งต่อเครื่องให้หน่วยอื่น / ล้างข้อมูลที่ลองบันทึกเล่น</p>
+    <div class="grid g2"><div class="dz-box del"><b>สิ่งที่จะถูกลบ</b><ul><li>ทะเบียนรับ–ส่งทุกรายการ และเลขทะเบียน</li><li>ไฟล์แนบที่เก็บในโปรแกรม ประวัติการแก้ไข ประวัติการใช้งาน</li><li>การตั้งค่าทั้งหมด (กลับเป็นค่าตั้งต้น) และรหัสผ่าน</li></ul></div>
+      <div class="dz-box keep"><b>สิ่งที่ไม่ลบ</b><ul><li><b>ไฟล์ Excel และรูปเอกสาร</b> ในโฟลเดอร์เก็บหนังสือ (เช่น D:\\ทะเบียนหนังสือ)</li><li>ไฟล์สำรอง (.zip) ทั้งหมด — และระบบจะ<b>สำรองให้อีกชุดก่อนลบเสมอ</b></li><li>ตัวโปรแกรมและฟอนต์</li></ul></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn danger" id="resetBtn" ${S.st.is_local ? '' : 'disabled'}>${ic('refresh')} เริ่มต้นใหม่…</button>${S.st.is_local ? '' : '<span class="muted">ทำได้เฉพาะที่เครื่องหลัก</span>'}</div></div>
   <div class="savebar"><span class="muted grow" id="dirty"></span><button class="btn primary big" id="save">${ic('save')} บันทึกการตั้งค่า</button></div>`;
   const jl = k => { try { return JSON.parse(s[k] || '[]'); } catch { return []; } };
   const markDirty = () => { $('#dirty').textContent = '● มีการเปลี่ยนแปลงที่ยังไม่บันทึก'; };
@@ -554,10 +564,11 @@ async function viewSettings() {
     if (!LE.duty_officers.get().length) { toast('ต้องมีผู้เข้าเวรอย่างน้อย 1 คน', 'err'); return; }
     try {
       await api('/api/settings', { method: 'PUT', json: { duty_title: g('duty_title'), duty_unit: g('duty_unit'), duty_officers: g('duty_officers'), org_name: g('org_name'), dept_name: g('dept_name'), year_mode: g('year_mode') === 'manual' ? g('year_val') : g('year_mode'), from_options: g('from_options'), to_options: g('to_options'), book_no_prefixes: g('book_no_prefixes'), reg_format: g('reg_format'), reg_pad: g('reg_pad'),
-        start_in: g('start_in'), start_out: g('start_out'), ui_font: $('[name=ui_font]:checked') ? $('[name=ui_font]:checked').value : 'plex', ui_scale: $('[name=ui_scale]:checked').value, print_font_size: g('print_font_size'), data_color: g('data_color') } });
+        start_in: g('start_in'), start_out: g('start_out'), ui_font: $('[name=ui_font]:checked') ? $('[name=ui_font]:checked').value : 'plex', ui_scale: $('[name=ui_scale]:checked').value, fresh_start: '0', print_font_size: g('print_font_size'), data_color: g('data_color') } });
       toast('บันทึกการตั้งค่าเรียบร้อย', 'ok'); await loadState(); viewSettings();
     } catch (e) { toast(e.message, 'err', 7000); }
   };
+  $('#resetBtn').onclick = () => resetFlow();
   $('#cGo').onclick = async () => {
     const vals = { in: parseInt($('#cIn').value, 10), out: parseInt($('#cOut').value, 10) };
     if (!(vals.in > 0) && !(vals.out > 0)) { toast('ใส่เลขตัวสุดท้ายในสมุดอย่างน้อย 1 ช่อง', 'err'); return; }
@@ -580,6 +591,48 @@ async function viewSettings() {
   $('#pw_save').onclick = async () => {
     try { const r = await api('/api/settings/password', { json: { current: $('#pw_cur') ? $('#pw_cur').value : '', next: $('#pw_new').value } }); toast(r.has_password ? 'ตั้งรหัสผ่านแล้ว ต้องเข้าสู่ระบบใหม่' : 'ลบรหัสผ่านแล้ว', 'ok'); setTimeout(() => location.reload(), 800); } catch (e) { toast(e.message, 'err'); }
   };
+}
+
+/* ---------- เริ่มต้นใหม่: ยืนยัน 2 ชั้น ---------- */
+async function resetFlow() {
+  let info; try { info = await api('/api/reset/info'); } catch (e) { toast(e.message, 'err'); return; }
+  const close = mm => mm.el.parentElement.remove();
+  // ชั้นที่ 1: สำรองข้อมูลแล้วหรือยัง
+  const ok1 = await new Promise(res => {
+    const mm = modal(`<h2>① สำรองข้อมูลไว้แล้วหรือยัง?</h2>
+      <p>${info.last_backup ? `สำรองล่าสุด: <b>${fmtStamp(info.last_backup.at)}</b><br><span class="muted">${esc(info.backup_dir)}</span>` : '<b style="color:var(--danger)">ยังไม่เคยสำรองข้อมูล</b>'}</p>
+      <div class="notice ok">ไม่ต้องกังวล: ก่อนลบ ระบบจะ<b>สำรองข้อมูลทั้งหมดให้อีกชุดอัตโนมัติ</b> (ชื่อไฟล์ขึ้นต้น before-reset) กู้คืนกลับได้เสมอ</div>
+      <p class="muted">ถ้าอยากเก็บไว้นอกเครื่องด้วย ไปที่หน้าสำรองข้อมูลแล้วคัดลอกไฟล์ zip ใส่แฟลชไดรฟ์ก่อน</p>
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" data-x>ยกเลิก</button><a class="btn" href="#/backup" data-go>ไปหน้าสำรองข้อมูล</a><button class="btn primary" data-next>สำรองแล้ว ไปต่อ →</button></div>`, { small: true, onClose: () => res(false) });
+    $('[data-x]', mm.el).onclick = () => { close(mm); res(false); };
+    $('[data-go]', mm.el).onclick = () => { close(mm); res(false); };
+    $('[data-next]', mm.el).onclick = () => { close(mm); res(true); };
+  });
+  if (!ok1) return;
+  // ชั้นที่ 2: ข้อมูลทั้งหมดจะหายไป
+  await new Promise(res => {
+    const mm = modal(`<h2 style="color:var(--danger)">② ข้อมูลทั้งหมดจะหายไป</h2>
+      <div class="notice err"><b>จะลบ:</b> ทะเบียนรับ ${info.books_in} รายการ · ทะเบียนส่ง ${info.books_out} รายการ · ไฟล์แนบในโปรแกรม ${info.attachments} ไฟล์ · ประวัติ · การตั้งค่า · รหัสผ่าน</div>
+      <div class="notice ok"><b>ไม่ลบ:</b> ไฟล์ Excel และรูปเอกสารใน <b>${esc(info.archive_dir)}</b> · ไฟล์สำรอง zip ใน ${esc(info.backup_dir)}</div>
+      <div class="field"><label class="f">พิมพ์คำว่า <b>เริ่มใหม่</b> เพื่อยืนยัน</label><input type="text" id="rsTxt" autocomplete="off" placeholder="เริ่มใหม่"></div>
+      ${S.st.has_password ? '<div class="field"><label class="f">รหัสผ่านเข้าโปรแกรม</label><input type="password" id="rsPw" autocomplete="off"></div>' : ''}
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" data-x>ยกเลิก</button><button class="btn danger" data-do disabled>ลบข้อมูลทั้งหมดและเริ่มใหม่</button></div>`, { small: true, onClose: () => res() });
+    const txt = $('#rsTxt', mm.el), go = $('[data-do]', mm.el); txt.focus();
+    txt.oninput = () => { go.disabled = txt.value.trim() !== 'เริ่มใหม่'; };
+    $('[data-x]', mm.el).onclick = () => { close(mm); res(); };
+    go.onclick = async () => {
+      go.disabled = true; go.textContent = 'กำลังสำรองและล้างข้อมูล…';
+      try {
+        const r = await api('/api/reset', { json: { confirm: txt.value, password: $('#rsPw', mm.el) ? $('#rsPw', mm.el).value : '' } });
+        close(mm); res();
+        try { sessionStorage.removeItem('duty'); } catch { /* ignore */ }
+        const done = modal(`<h2>✅ เริ่มต้นใหม่เรียบร้อย</h2><p>สำรองข้อมูลชุดเดิมไว้ที่<br><b>${esc(r.backup_dir)}</b><br><code>${esc(r.backup)}</code></p>
+          <p class="muted">ไฟล์ Excel และรูปเอกสารเดิมยังอยู่ที่ ${esc(r.archive_dir)} (ไม่ถูกแตะ)</p>
+          <div class="row" style="justify-content:flex-end"><button class="btn primary" data-ok>ไปตั้งค่าหน่วยใหม่ →</button></div>`, { small: true, onClose: () => { location.hash = '#/settings'; route(); } });
+        $('[data-ok]', done.el).onclick = () => { done.el.parentElement.remove(); location.hash = '#/settings'; route(); };
+      } catch (e) { toast(e.message, 'err', 9000); go.disabled = false; go.textContent = 'ลบข้อมูลทั้งหมดและเริ่มใหม่'; }
+    };
+  });
 }
 
 /* ---------- ตัวแก้ไขรายการ (เพิ่ม/ลบ/แก้/เลื่อน/ตั้งค่าหลัก) ---------- */

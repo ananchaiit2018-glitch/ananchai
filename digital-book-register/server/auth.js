@@ -59,4 +59,5 @@ function setPassword(current, next) {
   db.setSetting('password_hash', next ? hash(next) : '');
   sessions.clear();
 }
-module.exports = { middleware, login, logout, setPassword, required, isAuthed };
+const checkPassword = pw => { const s = db.getSettings(); return !s.password_hash || verify(String(pw || ''), s.password_hash); };
+module.exports = { middleware, login, logout, setPassword, required, isAuthed, checkPassword };
