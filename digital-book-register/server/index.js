@@ -305,13 +305,21 @@ function createApp() {
   app.get('/api/backup/download/:name', wrap((req, res) => res.download(backup.filePath(req.params.name))));
   app.post('/api/backup/restore', uploadBig.single('file'), wrap((req, res) => {
     try {
+      const q = req.body || {};
+      if (String(q.confirm || '').trim() !== 'กู้คืน') throw new U.HttpError(400, 'พิมพ์คำว่า กู้คืน เพื่อยืนยัน');
+      if (!auth.checkPassword(q.password)) throw new U.HttpError(403, 'รหัสผ่านไม่ถูกต้อง');
       if (req.file) return res.json(backup.restoreFromZip(req.file.path));
       if (req.body && req.body.name) return res.json(backup.restoreFromZip(backup.filePath(String(req.body.name))));
       throw new U.HttpError(400, 'ไม่พบไฟล์สำรอง');
     } finally { if (req.file) fs.rmSync(req.file.path, { force: true }); }
   }));
   // restore ด้วยชื่อไฟล์ ส่งแบบ JSON ได้เช่นกัน
-  app.post('/api/backup/restore-local', wrap((req, res) => res.json(backup.restoreFromZip(backup.filePath(String((req.body || {}).name))))));
+  app.post('/api/backup/restore-local', wrap((req, res) => {
+    const q = req.body || {};
+    if (String(q.confirm || '').trim() !== 'กู้คืน') throw new U.HttpError(400, 'พิมพ์คำว่า กู้คืน เพื่อยืนยัน');
+    if (!auth.checkPassword(q.password)) throw new U.HttpError(403, 'รหัสผ่านไม่ถูกต้อง');
+    res.json(backup.restoreFromZip(backup.filePath(String(q.name))));
+  }));
 
   // เลือกโฟลเดอร์สำรอง (เรียกดูโฟลเดอร์ของเครื่องหลัก ใช้ได้เฉพาะที่เครื่องหลักเท่านั้น)
   app.get('/api/fs/list', wrap((req, res) => { if (!isLocal(req)) throw new U.HttpError(403, 'เลือกโฟลเดอร์ได้เฉพาะที่เครื่องหลัก — กรุณาพิมพ์ตำแหน่งเอง'); res.json(fsb.listDir(req.query.path)); }));

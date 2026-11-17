@@ -116,11 +116,12 @@ test('11-12 เปิดใหม่ข้อมูลยังอยู่ / �
   const z = new AdmZip(path.join(backup.backupDir(), bk.name)); assert.ok(z.getEntry('register.db') && z.getEntry('manifest.json') && z.getEntries().some(e => e.entryName.startsWith('signatures/')) && z.getEntries().some(e => e.entryName.startsWith('attachments/')));
   await jj('/api/books/in', { json: book({ subject: 'หลังสำรอง' }) });
   assert.equal((await jj('/api/books?limit=1')).d.total, before + 1);
-  const rs = await jj('/api/backup/restore-local', { json: { name: bk.name } }); assert.equal(rs.s, 200, JSON.stringify(rs.d));
+  assert.equal((await jj('/api/backup/restore-local', { json: { name: bk.name } })).s, 400);   // ไม่ยืนยัน -> ไม่กู้คืน
+  const rs = await jj('/api/backup/restore-local', { json: { name: bk.name, confirm: 'กู้คืน' } }); assert.equal(rs.s, 200, JSON.stringify(rs.d));
   assert.equal((await jj('/api/books?limit=1')).d.total, before);
   assert.ok((await jj('/api/backup')).d.items.some(i => i.name.startsWith('before-restore')));
   assert.equal((await jj('/api/books/in', { json: book() })).s, 201);
-  const bad = new FormData(); bad.append('file', new Blob(['not a zip']), 'x.zip'); assert.equal((await fetch(base + '/api/backup/restore', { method: 'POST', body: bad })).status, 400);
+  const bad = new FormData(); bad.append('confirm', 'กู้คืน'); bad.append('file', new Blob(['not a zip']), 'x.zip'); assert.equal((await fetch(base + '/api/backup/restore', { method: 'POST', body: bad })).status, 400);
   assert.equal((await jj('/api/settings', { method: 'PUT', json: { backup_dir: path.join(tmp, 'fonts', 'regular.otf', 'x') } })).s, 400);
 });
 test('รหัสผ่านเข้าใช้งาน', async () => {

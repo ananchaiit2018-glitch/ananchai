@@ -823,12 +823,44 @@ async function viewBackup() {
       toast('บันทึกการตั้งค่าสำรองอัตโนมัติแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); }
   };
   $('#bdirsave').onclick = async () => { try { await api('/api/settings', { method: 'PUT', json: { backup_dir: $('#bdir').value } }); toast('บันทึกตำแหน่งสำรองข้อมูลแล้ว', 'ok'); await loadState(); viewBackup(); } catch (e) { toast(e.message, 'err', 8000); } };
-  const doRestore = async (fn) => {
-    if (!await confirmBox('ยืนยันการกู้คืนข้อมูล', '<p>ข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรอง ต้องการดำเนินการต่อหรือไม่?</p>', 'กู้คืนข้อมูล', true)) return;
-    try { const r = await fn(); toast(`กู้คืนข้อมูลสำเร็จ (สำรองข้อมูลเดิมไว้ที่ ${r.safety})`, 'ok', 9000); await loadState(); setTimeout(() => viewBackup(), 300); } catch (e) { toast('กู้คืนไม่สำเร็จ: ' + e.message, 'err', 9000); }
+  // กู้คืน: ยืนยัน 2 ชั้น (เหมือนเริ่มต้นใหม่)  src = { name, at, size } ของไฟล์ที่จะกู้คืน, send(extra) = ส่งคำขอพร้อมคำยืนยัน
+  const doRestore = async (src, send) => {
+    let info; try { info = await api('/api/reset/info'); } catch (e) { toast(e.message, 'err'); return; }
+    const close = mm => mm.el.parentElement.remove();
+    const ok1 = await new Promise(res => {
+      const mm = modal(`<h2>① สำรองข้อมูลปัจจุบันไว้แล้วหรือยัง?</h2>
+        <p>${info.last_backup ? `สำรองล่าสุด: <b>${fmtStamp(info.last_backup.at)}</b>` : '<b style="color:var(--danger)">ยังไม่เคยสำรองข้อมูล</b>'}</p>
+        <div class="notice ok">ก่อนกู้คืน ระบบจะ<b>สำรองข้อมูลปัจจุบันให้อัตโนมัติ</b> (ชื่อไฟล์ขึ้นต้น before-restore) ถ้ากู้ผิดไฟล์ ก็กู้กลับได้</div>
+        <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" data-x>ยกเลิก</button><button class="btn" data-bk>${ic('save')} สำรองตอนนี้</button><button class="btn primary" data-next>สำรองแล้ว ไปต่อ →</button></div>`, { small: true, onClose: () => res(false) });
+      $('[data-x]', mm.el).onclick = () => { close(mm); res(false); };
+      $('[data-next]', mm.el).onclick = () => { close(mm); res(true); };
+      $('[data-bk]', mm.el).onclick = async e => { e.target.disabled = true; e.target.textContent = 'กำลังสำรอง…';
+        const r = await api('/api/backup/run', { method: 'POST' }).catch(er => ({ ok: false, error: er.message }));
+        if (r.ok) { toast('สำรองข้อมูลแล้ว: ' + r.name, 'ok', 6000); close(mm); res(true); } else { toast('สำรองไม่สำเร็จ: ' + r.error, 'err', 8000); e.target.disabled = false; e.target.textContent = 'สำรองตอนนี้'; } };
+    });
+    if (!ok1) return;
+    await new Promise(res => {
+      const mm = modal(`<h2 style="color:var(--danger)">② ข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด</h2>
+        <div class="notice err"><b>ข้อมูลตอนนี้</b> (ทะเบียนรับ ${info.books_in} · ทะเบียนส่ง ${info.books_out} รายการ · ไฟล์แนบ ${info.attachments} ไฟล์ · การตั้งค่า) <b>จะถูกแทนที่</b>ด้วยข้อมูลในไฟล์</div>
+        <div class="notice warn">📦 <b>${esc(src.name)}</b>${src.at ? `<br>สำรองเมื่อ ${fmtStamp(src.at)}` : ''}${src.size ? ` · ${fmtSize(src.size)}` : ''}</div>
+        <p class="muted" style="margin:0 0 8px">รายการที่บันทึกหลังจากวันที่ของไฟล์นี้จะหายไป (แต่ยังอยู่ในไฟล์สำรอง before-restore)</p>
+        <div class="field"><label class="f">พิมพ์คำว่า <b>กู้คืน</b> เพื่อยืนยัน</label><input type="text" id="rtTxt" autocomplete="off" placeholder="กู้คืน"></div>
+        ${S.st.has_password ? '<div class="field"><label class="f">รหัสผ่านเข้าโปรแกรม</label><input type="password" id="rtPw" autocomplete="off"></div>' : ''}
+        <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" data-x>ยกเลิก</button><button class="btn danger" data-do disabled>กู้คืนข้อมูลจากไฟล์นี้</button></div>`, { small: true, onClose: () => res() });
+      const txt = $('#rtTxt', mm.el), go = $('[data-do]', mm.el); txt.focus();
+      txt.oninput = () => { go.disabled = txt.value.trim() !== 'กู้คืน'; };
+      $('[data-x]', mm.el).onclick = () => { close(mm); res(); };
+      go.onclick = async () => {
+        go.disabled = true; go.textContent = 'กำลังกู้คืน…';
+        try { const r = await send({ confirm: txt.value.trim(), password: $('#rtPw', mm.el) ? $('#rtPw', mm.el).value : '' });
+          close(mm); res(); toast(`กู้คืนข้อมูลสำเร็จ (สำรองข้อมูลก่อนกู้คืนไว้ที่ ${r.safety})`, 'ok', 9000); await loadState(); setTimeout(() => viewBackup(), 300);
+        } catch (e) { toast('กู้คืนไม่สำเร็จ: ' + e.message, 'err', 9000); go.disabled = false; go.textContent = 'กู้คืนข้อมูลจากไฟล์นี้'; }
+      };
+    });
   };
-  $$('[data-rs]').forEach(bt => bt.onclick = () => doRestore(() => api('/api/backup/restore-local', { json: { name: bt.dataset.rs } })));
-  $('#rbtn').onclick = () => { const f = $('#rfile').files[0]; if (!f) { toast('กรุณาเลือกไฟล์สำรอง (.zip)', 'err'); return; } doRestore(() => { const fd = new FormData(); fd.append('file', f); return api('/api/backup/restore', { method: 'POST', body: fd }); }); };
+  $$('[data-rs]').forEach(bt => bt.onclick = () => { const it = b.items.find(i => i.name === bt.dataset.rs) || { name: bt.dataset.rs };
+    doRestore(it, extra => api('/api/backup/restore-local', { json: { name: it.name, ...extra } })); });
+  $('#rbtn').onclick = () => { const f = $('#rfile').files[0]; if (!f) { toast('กรุณาเลือกไฟล์สำรอง (.zip)', 'err'); return; } doRestore({ name: f.name, size: f.size }, extra => { const fd = new FormData(); fd.append('confirm', extra.confirm); fd.append('password', extra.password); fd.append('file', f); return api('/api/backup/restore', { method: 'POST', body: fd }); }); };
 }
 
 /* ---------- เข้าสู่ระบบ ---------- */
