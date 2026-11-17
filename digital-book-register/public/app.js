@@ -5,7 +5,7 @@ const KIND = { in: 'หนังสือรับ', out: 'หนังสือ
 const MENU = [
   ['grp', 'งานประจำวัน'], ['dashboard', 'home', 'หน้าหลัก'], ['new/in', 'inbox', 'เพิ่มหนังสือรับ'], ['new/out', 'send', 'เพิ่มหนังสือส่ง'],
   ['grp', 'ทะเบียน'], ['list/in', 'book', 'ทะเบียนหนังสือรับ'], ['list/out', 'book', 'ทะเบียนหนังสือส่ง'], ['search', 'search', 'ค้นหาหนังสือ'], ['reports', 'printer', 'พิมพ์และส่งออก'],
-  ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'],
+  ['grp', 'ระบบ'], ['settings', 'sliders', 'ตั้งค่าระบบ'], ['backup', 'db', 'สำรองข้อมูล'], ['activity', 'log', 'บันทึกการใช้งาน'],
 ];
 // ฟอนต์หน้าจอ (ฝังในโปรแกรม ใช้ออฟไลน์ได้) — การพิมพ์/PDF ยังใช้ TH Sarabun เสมอ
 const UI_FONTS = [
@@ -271,7 +271,7 @@ async function viewList(kind) {
   async function load() {
     const my = ++seq;
     const r = await api('/api/books?' + qs({ ...F, limit: 50 }));
-    if (my !== seq) return;
+    if (my !== seq || !m.isConnected) return;   // ผู้ใช้เปลี่ยนหน้าไปแล้ว
     $('#count').textContent = `พบ ${r.total} รายการ`;
     $('#rows').innerHTML = r.rows.length ? r.rows.map(b => `<tr class="click ${b.status}" data-id="${b.id}"><td class="nostrike"><input type="checkbox" data-sel="${b.id}" ${sel.has(b.id) ? 'checked' : ''}></td>
       ${isAll ? `<td class="nostrike"><span class="tag ${b.kind}">${b.kind === 'in' ? 'รับ' : 'ส่ง'}</span></td>` : ''}
@@ -385,7 +385,7 @@ async function viewReports(params) {
     } catch (e) { toast(e.message, 'err', 8000); return false; }
   }
   $('#prev').onclick = preview;
-  $('#print').onclick = () => { try { $('#pv').contentWindow.focus(); $('#pv').contentWindow.print(); } catch { window.open(blobUrl, '_blank'); } };
+  $('#print').onclick = () => { api('/api/activity/print', { json: { query: q() } }).catch(() => {}); try { $('#pv').contentWindow.focus(); $('#pv').contentWindow.print(); } catch { window.open(blobUrl, '_blank'); } };
   const dl = (fmt, extra) => () => {
     if (val('scope') === 'range' && (!from.get() || !to.get())) { toast('กรุณาระบุช่วงวันที่ให้ครบ', 'err'); return; }
     fetch(`/api/export/${fmt}?` + q({ download: '1' }), { credentials: 'same-origin' }).then(async r => {
@@ -524,6 +524,64 @@ function listEditor(host, items, o = {}) {
   return { get: () => list.slice() };
 }
 
+/* ---------- บันทึกการใช้งาน (log) ---------- */
+async function viewActivity() {
+  const m = shell('activity');
+  const F = { from: todayISO(), to: todayISO(), actor: '', action: '', q: '', page: 1 };
+  const meta = await api('/api/activity?limit=1'); if (!m.isConnected) return;
+  const grpOf = a => Object.keys(meta.groups).find(g => meta.groups[g].actions.includes(a)) || 'system';
+  m.innerHTML = header('บันทึกการใช้งาน', `<button class="btn" id="lgx">${ic('download')} ส่งออก Excel</button>`, `${ic('log')} ใครเข้าเวร ทำอะไร เมื่อไร จากเครื่องไหน · ระบบบันทึกให้อัตโนมัติ แก้ไขหรือลบไม่ได้`) + `
+    <div class="card"><div class="row" style="margin-bottom:10px"><div class="seg" id="quick">
+        <label><input type="radio" name="qr" value="today" checked>วันนี้</label><label><input type="radio" name="qr" value="7">7 วันล่าสุด</label>
+        <label><input type="radio" name="qr" value="month">เดือนนี้</label><label><input type="radio" name="qr" value="all">ทั้งหมด</label><label><input type="radio" name="qr" value="range">เลือกช่วงวันที่</label></div></div>
+      <div class="row" id="rangeRow" hidden><span>ตั้งแต่</span><div id="lgFrom" style="width:220px"></div><span>ถึง</span><div id="lgTo" style="width:220px"></div></div>
+      <div class="row" style="margin-top:10px">
+        <select id="lgActor" style="width:260px"><option value="">ผู้ทำรายการ: ทุกคน</option>${meta.actors.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select>
+        <select id="lgAction" style="width:280px"><option value="">การกระทำ: ทั้งหมด</option>${Object.entries(meta.groups).map(([g, x]) => `<optgroup label="${esc(x.label)}"><option value="${g}">— ${esc(x.label)} ทั้งหมด</option>${x.actions.map(a => `<option value="${a}">${esc(meta.actions[a])}</option>`).join('')}</optgroup>`).join('')}</select>
+        <div class="grow"><input type="search" id="lgQ" placeholder="ค้นหาในรายละเอียด เช่น เลขทะเบียน 012/2570 หรือชื่อเรื่อง"></div></div></div>
+    <div id="lgSum" class="lgsum"></div>
+    <div class="tw"><table class="t"><thead><tr><th>วันเวลา</th><th>ผู้ทำรายการ</th><th>การกระทำ</th><th>รายละเอียด</th><th>เครื่อง</th></tr></thead><tbody id="lgRows"></tbody></table></div>
+    <div class="pager" id="lgPager"></div>`;
+  const pf = thaiDatePicker(F.from), pt = thaiDatePicker(F.to); $('#lgFrom').append(pf.el); $('#lgTo').append(pt.el);
+  const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  function range() {
+    const v = $('[name=qr]:checked').value, n = new Date(); $('#rangeRow').hidden = v !== 'range';
+    if (v === 'today') { F.from = F.to = iso(n); }
+    else if (v === '7') { const a = new Date(n); a.setDate(a.getDate() - 6); F.from = iso(a); F.to = iso(n); }
+    else if (v === 'month') { F.from = iso(new Date(n.getFullYear(), n.getMonth(), 1)); F.to = iso(n); }
+    else if (v === 'all') { F.from = F.to = ''; }
+    else { F.from = pf.get(); F.to = pt.get(); }
+  }
+  let seq = 0;
+  async function load() {
+    const my = ++seq; const r = await api('/api/activity?' + qs({ ...F, limit: 100 })); if (my !== seq || !m.isConnected) return;
+    const fmtAt = a => { const d = new Date(a); return `${fmtDate(iso(d))} <b>${p2(d.getHours())}:${p2(d.getMinutes())}</b><small class="muted">:${p2(d.getSeconds())}</small>`; };
+    $('#lgSum').innerHTML = `<span class="muted">${r.total.toLocaleString()} รายการ</span>${r.byActor.map(x => `<button class="chip ${F.actor === x.actor ? 'on' : ''}" data-actor="${esc(x.actor)}"><span class="av sm">${esc(initialOf(x.actor || '?'))}</span>${esc(x.actor || 'ไม่ระบุ')} <b>${x.n}</b></button>`).join('')}`;
+    $('#lgRows').innerHTML = r.rows.map(x => `<tr class="${x.ref_id ? 'click' : ''}" data-ref="${x.ref_id || ''}"><td class="nowrap">${fmtAt(x.at)}</td><td class="nowrap">${x.actor ? `<b>${esc(shortName(x.actor))}</b>` : '<span class="muted">-</span>'}</td>
+      <td class="nowrap"><span class="lgtag ${grpOf(x.action)} ${x.action}">${esc(r.actions[x.action] || x.action)}</span></td><td>${esc(x.detail)}</td><td class="nowrap muted">${esc(x.machine)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">ไม่มีบันทึกในช่วงนี้</td></tr>';
+    const pages = Math.max(1, Math.ceil(r.total / r.limit));
+    $('#lgPager').innerHTML = pages > 1 ? `<button class="btn sm" data-p="${F.page - 1}" ${F.page <= 1 ? 'disabled' : ''}>‹ ก่อนหน้า</button><span class="muted">หน้า ${F.page} / ${pages}</span><button class="btn sm" data-p="${F.page + 1}" ${F.page >= pages ? 'disabled' : ''}>ถัดไป ›</button>` : '';
+    $$('[data-p]', m).forEach(b => b.onclick = () => { F.page = +b.dataset.p; load(); });
+    $$('[data-actor]', m).forEach(b => b.onclick = () => { F.actor = F.actor === b.dataset.actor ? '' : b.dataset.actor; $('#lgActor').value = F.actor; F.page = 1; load(); });
+    $$('#lgRows tr.click').forEach(tr => tr.onclick = () => openDetail(+tr.dataset.ref).catch(e => toast(e.message, 'err')));
+  }
+  const reload = () => { F.page = 1; load(); };
+  $$('[name=qr]').forEach(r => r.onchange = () => { range(); reload(); });
+  pf.onChange(() => { range(); reload(); }); pt.onChange(() => { range(); reload(); });
+  $('#lgActor').onchange = () => { F.actor = $('#lgActor').value; reload(); };
+  $('#lgAction').onchange = () => { F.action = $('#lgAction').value; reload(); };
+  $('#lgQ').oninput = debounce(() => { F.q = $('#lgQ').value.trim(); reload(); }, 250);
+  $('#lgx').onclick = () => {
+    fetch('/api/activity/export?' + qs(F), { credentials: 'same-origin' }).then(async r => {
+      if (!r.ok) throw new Error('ส่งออกไม่สำเร็จ');
+      const cd = r.headers.get('content-disposition') || ''; const nm = decodeURIComponent((/filename\*=UTF-8''([^;]+)/.exec(cd) || [])[1] || 'log.xlsx');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = nm; document.body.append(a); a.click(); a.remove(); toast('ส่งออกแล้ว: ' + nm, 'ok');
+    }).catch(e => toast(e.message, 'err'));
+  };
+  load();
+}
+
 /* ---------- หน้าต่างเลือกโฟลเดอร์ (เครื่องหลัก) ---------- */
 function pickFolder(start) {
   return new Promise(resolve => {
@@ -615,11 +673,18 @@ function viewDuty() {
     <div class="officers">${list.map((n, i) => `<button class="officer" data-i="${i}"><span class="av">${esc(initialOf(n))}</span><span class="grow"><b>${esc(shortName(n))}</b><small>${esc(n)}</small></span>${ic('right')}</button>`).join('') || '<div class="notice warn">ยังไม่มีรายชื่อผู้เข้าเวร</div>'}</div>
     <a href="#/settings" class="muted small-link">${ic('sliders')} ตั้งค่ารายชื่อผู้เข้าเวร</a></div></div>`;
   $('#app').append(themeButton());
-  $$('[data-i]').forEach(b => b.onclick = () => { try { sessionStorage.setItem('duty', list[+b.dataset.i]); } catch { /* ignore */ } if (location.hash === '#/dashboard') route(); else location.hash = '#/dashboard'; });
+  $$('[data-i]').forEach(b => b.onclick = async () => {
+    const name = list[+b.dataset.i], prev = getDuty();
+    try { sessionStorage.setItem('duty', name); } catch { /* ignore */ }
+    if (name !== prev) await api('/api/duty', { json: { name, prev } }).catch(() => {});   // บันทึกการเข้าเวร
+    if (location.hash === '#/dashboard') route(); else location.hash = '#/dashboard';
+  });
 }
 
 /* ---------- เส้นทาง ---------- */
+let navSeq = 0;   // กันหน้าเก่าที่โหลดช้ามาทับหน้าใหม่เมื่อกดเปลี่ยนหน้าเร็วๆ
 async function route() {
+  const myNav = ++navSeq;
   const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [path, query] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(query || ''));
   try {
     await loadState();
@@ -633,8 +698,9 @@ async function route() {
     else if (path === 'reports') await viewReports(params);
     else if (path === 'settings') await viewSettings();
     else if (path === 'backup') await viewBackup();
+    else if (path === 'activity') await viewActivity();
     else location.hash = '#/dashboard';
-  } catch (e) { if (e.message !== 'กรุณาเข้าสู่ระบบ') { (S.st ? shell('') : $('#app')).innerHTML = `<div class="card notice err" style="margin:20px">${esc(e.message)}</div>`; } }
+  } catch (e) { if (myNav !== navSeq) return; if (e.message !== 'กรุณาเข้าสู่ระบบ') { (S.st ? shell('') : $('#app')).innerHTML = `<div class="card notice err" style="margin:20px">${esc(e.message)}</div>`; } }
 }
 async function boot() {
   setAuthLost(viewLogin);

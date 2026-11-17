@@ -15,6 +15,7 @@ const U = require('./util');
 const fsb = require('./fsbrowse');
 const isLocal = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 const ctx = require('./context');
+const activity = require('./activity');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 10 } });
 const uploadBig = multer({ dest: path.join(cfg.DATA_DIR, '.uploads'), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
@@ -37,6 +38,59 @@ function createApp() {
   });
   app.use(express.json({ limit: '6mb' }));
   const wrap = fn => (req, res, next) => { try { const r = fn(req, res); if (r && r.catch) r.catch(next); } catch (e) { next(e); } };
+
+  /* --- บันทึกการใช้งาน (log): ดูผลลัพธ์ของแต่ละคำขอแล้วบันทึกว่าใครทำอะไร --- */
+  const SET_LABELS = { duty_title: 'หัวข้อหน้าแรก', duty_unit: 'หน่วยที่ประจำ', duty_officers: 'รายชื่อผู้เข้าเวร', book_no_prefixes: 'ตัวนำหน้า ที่',
+    from_options: 'ตัวเลือก จาก', to_options: 'ตัวเลือก ถึง', org_name: 'ชื่อหน่วยงาน', dept_name: 'ชื่อส่วนราชการ', year_mode: 'ปีที่ใช้ออกเลข',
+    reg_format: 'รูปแบบเลขทะเบียน', reg_pad: 'จำนวนหลัก', start_in: 'เลขเริ่มต้นรับ', start_out: 'เลขเริ่มต้นส่ง', ui_font: 'ฟอนต์หน้าจอ', ui_scale: 'ขนาดตัวอักษร',
+    print_font_size: 'ขนาดตัวอักษรพิมพ์', data_color: 'สีตัวอักษร', auto_backup: 'สำรองอัตโนมัติ', backup_every_hours: 'ความถี่สำรอง', backup_keep: 'จำนวนชุดสำรอง',
+    backup_on_exit: 'สำรองตอนปิดโปรแกรม', backup_excel: 'สำรองเป็น Excel', live_excel: 'Excel อัปเดตอัตโนมัติ', backup_dir: 'โฟลเดอร์สำรอง', backup_dir2: 'โฟลเดอร์สำรองที่สอง' };
+  const FLD = { book_no: 'ที่', book_date: 'ลงวันที่', from_org: 'จาก', to_org: 'ถึง', subject: 'เรื่อง', action: 'การปฏิบัติ', remark: 'หมายเหตุ', receiver_name: 'ผู้รับ', receiver_at: 'วันเวลารับ', sender_name: 'ผู้ส่ง', sender_at: 'วันเวลาส่ง' };
+  const KN = k => k === 'out' ? 'ทะเบียนส่ง' : 'ทะเบียนรับ';
+  const RULES = [
+    ['POST', /^\/api\/login$/, (q, b, st) => st < 300 ? ['login', 'เข้าสู่ระบบด้วยรหัสผ่าน'] : st === 401 ? ['login_fail', 'ใส่รหัสผ่านไม่ถูกต้อง'] : null, true],
+    ['POST', /^\/api\/logout$/, () => ['logout', '']],
+    ['POST', /^\/api\/duty$/, q => { const prev = String((q.body || {}).prev || ''); const name = String((q.body || {}).name || ''); return prev && prev !== name ? ['duty_change', `เปลี่ยนจาก ${prev}`] : ['duty_start', 'เริ่มเข้าเวร']; }],
+    ['POST', /^\/api\/books\/(in|out)$/, (q, b) => b && !b.duplicate ? ['book_create', `${KN(b.kind)} ${b.reg_label} · ${b.subject}`, b.id] : null],
+    ['PUT', /^\/api\/books\/id\/\d+$/, (q, b) => { if (!b) return null; const h = (b.history || [])[0]; const f = h && h.action === 'update' ? Object.keys(h.changes || {}).map(k => FLD[k] || k) : [];
+      return ['book_update', `${KN(b.kind)} ${b.reg_label} · ${b.subject}${f.length ? ' · แก้: ' + f.join(', ') : ' · (ไม่มีการเปลี่ยนแปลง)'}`, b.id]; }],
+    ['POST', /^\/api\/books\/id\/\d+\/cancel$/, (q, b) => b ? ['book_cancel', `${KN(b.kind)} ${b.reg_label} · เหตุผล: ${(q.body || {}).reason || '-'}`, b.id] : null],
+    ['POST', /^\/api\/books\/id\/(\d+)\/attachments$/, (q, b, st, m) => { let r = ''; try { r = books.get(+m[1]).reg_label; } catch { /* ignore */ } return ['attach_add', `${r} · ${(q.files || []).map(f => fixName(f.originalname)).join(', ')}`, +m[1]]; }],
+    ['DELETE', /^\/api\/attachments\/(\d+)$/, (q, b, st, m) => ['attach_remove', `ไฟล์แนบรหัส ${m[1]}`]],
+    ['PUT', /^\/api\/settings$/, q => { const before = q._settingsBefore || {}; const after = db.getSettings();
+      const ch = Object.keys(SET_LABELS).filter(k => String(before[k] ?? '') !== String(after[k] ?? '')).map(k => SET_LABELS[k]);
+      return ch.length ? ['settings', ch.join(', ')] : null; }],
+    ['POST', /^\/api\/settings\/password$/, (q, b) => ['password', b && b.has_password ? 'ตั้ง/เปลี่ยนรหัสผ่าน' : 'ลบรหัสผ่าน']],
+    ['POST', /^\/api\/settings\/font\/(\w+)$/, (q, b, st, m) => ['font', `นำเข้าฟอนต์ (${m[1]})`]],
+    ['DELETE', /^\/api\/settings\/font\/(\w+)$/, (q, b, st, m) => ['font', `ลบฟอนต์ (${m[1]})`]],
+    ['POST', /^\/api\/settings\/logo$/, () => ['logo', 'อัปโหลดโลโก้']],
+    ['DELETE', /^\/api\/settings\/logo$/, () => ['logo', 'ลบโลโก้']],
+    ['PUT', /^\/api\/counters$/, q => { const x = q.body || {}; return ['counters', `${KN(x.kind)} ปี ${x.year} เลขถัดไป = ${x.next_no}`]; }],
+    ['GET', /^\/api\/export\/(xlsx|csv|pdf)$/, (q, b, st, m) => { if (m[1] === 'pdf' && q.query.download !== '1') return null; let line = ''; try { line = exp.resolveScope(q.query).line || ''; } catch { /* ignore */ }
+      return ['export', `${m[1].toUpperCase()} ${exp.titleOf(q.query.kind === 'out' ? 'out' : 'in')} ${line}`]; }],
+    ['GET', /^\/api\/export-all\/xlsx$/, () => ['export', 'Excel ทะเบียนรับ+ส่ง ทั้งหมด']],
+    ['POST', /^\/api\/activity\/print$/, q => { const x = Object.fromEntries(new URLSearchParams(String((q.body || {}).query || ''))); let line = ''; try { line = exp.resolveScope(x).line || ''; } catch { /* ignore */ }
+      return ['print', `${exp.titleOf(x.kind === 'out' ? 'out' : 'in')} ${line}`]; }],
+    ['POST', /^\/api\/backup\/run$/, (q, b) => ['backup', b && b.ok ? `${b.name}${b.excel ? ' + ' + b.excel : ''}` : `ไม่สำเร็จ: ${(b && b.error) || ''}`]],
+    ['POST', /^\/api\/backup\/restore(-local)?$/, q => ['restore', (q.body && q.body.name) || (q.file && fixName(q.file.originalname)) || 'จากไฟล์']],
+    ['POST', /^\/api\/shutdown$/, () => ['app_stop', 'ปิดจากหน้าจอโปรแกรม']],
+  ];
+  app.use((req, res, next) => {
+    const rule = RULES.find(r => r[0] === req.method && r[1].test(req.path)); if (!rule) return next();
+    if (rule[1].source.includes('settings$')) req._settingsBefore = db.getSettings();
+    let body = null; const json = res.json.bind(res); res.json = b => { body = b; return json(b); };
+    res.on('finish', () => {
+      if (res.statusCode >= 300 && !rule[3]) return;
+      try {
+        const out = rule[2](req, body, res.statusCode, req.path.match(rule[1])); if (!out) return;
+        let actor = ''; try { actor = decodeURIComponent(req.headers['x-duty-officer'] || ''); } catch { /* ignore */ }
+        if (out[0] === 'duty_start' || out[0] === 'duty_change') actor = String((req.body || {}).name || actor);
+        const ip = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+        activity.log(out[0], out[1], { actor: actor.replace(/[\r\n]/g, ' '), ref: out[2], machine: isLocal(req) ? 'เครื่องหลัก' : ip });
+      } catch (e) { console.error('log:', e.message); }
+    });
+    next();
+  });
 
   /* --- ไม่ต้องล็อกอิน --- */
   app.get('/api/session', (req, res) => res.json({ auth_required: auth.required(), authenticated: auth.isAuthed(req), version: cfg.VERSION }));
@@ -191,6 +245,22 @@ function createApp() {
     throw new U.HttpError(400, 'รูปแบบไฟล์ไม่ถูกต้อง');
   }));
 
+  /* --- บันทึกการใช้งาน --- */
+  app.post('/api/duty', wrap((req, res) => { const n = String((req.body || {}).name || '').trim(); if (!n) throw new U.HttpError(400, 'ไม่มีชื่อผู้เข้าเวร'); res.json({ ok: true }); }));
+  app.post('/api/activity/print', wrap((req, res) => res.json({ ok: true })));
+  app.get('/api/activity', wrap((req, res) => res.json(activity.list(req.query))));
+  app.get('/api/activity/export', wrap(async (req, res) => {
+    const ExcelJS = require('exceljs'); const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('บันทึกการใช้งาน');
+    ws.columns = [{ header: 'วันที่', width: 14 }, { header: 'เวลา', width: 9 }, { header: 'ผู้เข้าเวร / ผู้ทำรายการ', width: 26 }, { header: 'การกระทำ', width: 20 }, { header: 'รายละเอียด', width: 70 }, { header: 'เครื่อง', width: 14 }];
+    ws.getRow(1).font = { bold: true }; ws.views = [{ state: 'frozen', ySplit: 1 }];
+    for (const r of activity.forExport(req.query)) {
+      const d = new Date(r.at); const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+      const [y, mo, da] = r.day.split('-').map(Number);
+      ws.addRow([`${da}/${mo}/${y + 543}`, t, r.actor || '-', activity.ACTIONS[r.action] || r.action, r.detail, r.machine]);
+    }
+    const d = new Date(); send(res, Buffer.from(await wb.xlsx.writeBuffer()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', `บันทึกการใช้งาน-${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear() + 543}`, '.xlsx', true);
+  }));
+
   /* --- ไฟล์ Excel อัปเดตอัตโนมัติ / ส่งออก Excel ทั้งหมด --- */
   app.get('/api/live-excel', wrap((req, res) => res.json(live.status())));
   app.post('/api/live-excel/update', wrap(async (req, res) => res.json(await live.write())));
@@ -250,8 +320,10 @@ function start() {
   db.open();
   fonts.installBundled();
   const app = createApp();
-  Promise.resolve(backup.autoIfDue()).then(auto => { if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}${auto.excel ? ' + ' + auto.excel : ''}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`); }).catch(e => console.error(e));
-  const timer = setInterval(() => { Promise.resolve(backup.autoIfDue()).catch(e => console.error(e)); }, 10 * 60 * 1000); timer.unref();
+  activity.log('app_start', `เวอร์ชัน ${cfg.VERSION || ''} · พอร์ต ${cfg.PORT}`, { actor: 'ระบบ', machine: 'เครื่องหลัก' });
+  const logAuto = auto => { if (auto) activity.log('backup_auto', auto.ok ? `${auto.name}${auto.excel ? ' + ' + auto.excel : ''}` : `ไม่สำเร็จ: ${auto.error}`, { actor: 'ระบบ', machine: 'เครื่องหลัก' }); return auto; };
+  Promise.resolve(backup.autoIfDue()).then(logAuto).then(auto => { if (auto) console.log(auto.ok ? `[สำรองอัตโนมัติ] ${auto.name}${auto.excel ? ' + ' + auto.excel : ''}` : `[สำรองอัตโนมัติล้มเหลว] ${auto.error}`); }).catch(e => console.error(e));
+  const timer = setInterval(() => { Promise.resolve(backup.autoIfDue()).then(logAuto).catch(e => console.error(e)); }, 10 * 60 * 1000); timer.unref();
   const openBrowser = () => { if (process.argv.includes('--open') && process.platform === 'win32') require('child_process').exec(`start "" "http://localhost:${cfg.PORT}"`); };
   live.schedule(300);
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
