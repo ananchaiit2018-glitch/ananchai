@@ -172,6 +172,12 @@ async function viewForm(kind, editId) {
     <form class="card" id="f" autocomplete="off">
       <div class="regbox"><div>เลขทะเบียน${isIn ? 'รับ' : 'ส่ง'}</div><b>${edit ? esc(edit.reg_label) : esc(next.label)}</b>
         <small class="muted">${edit ? 'เลขทะเบียนแก้ไขไม่ได้' : 'ระบบออกเลขให้อัตโนมัติเมื่อกดบันทึก (เลขจริงอาจเปลี่ยนถ้ามีเครื่องอื่นบันทึกก่อน)'} · ไม่ใช่เลขที่หนังสือราชการ</small></div>
+      <div class="ocrbox" id="ocrbox">
+        <div class="ocr-drop" id="ocrDrop"><span class="ocr-ic">${ic('scan')}</span>
+          <div class="grow"><b>มีรูปหนังสือไหม? ให้โปรแกรมอ่านแล้วกรอกให้</b><small>ลากรูปมาวางตรงนี้ · กดเลือกรูป · หรือกด <kbd>Ctrl</kbd>+<kbd>V</kbd> วางรูป — อ่านในเครื่องนี้ ไม่ส่งออกอินเทอร์เน็ต</small></div>
+          <button type="button" class="btn primary" id="ocrPick">${ic('image')} เลือกรูป</button><input type="file" id="ocrFile" accept="image/*" hidden></div>
+        <div class="ocr-run" id="ocrRun" hidden><img id="ocrThumb" alt=""><div class="grow"><b id="ocrMsg">กำลังเตรียมตัวอ่าน…</b><div class="ocr-bar"><i id="ocrBar"></i></div><small class="muted" id="ocrSub">ครั้งแรกอาจใช้เวลาสักครู่</small></div></div>
+      </div>
       <div class="sec"><span>1</span>ข้อมูลหนังสือ <small>เรียงตามช่องในทะเบียน</small></div>
       <div class="grid g2"><div class="field"><label class="f">ที่ <small>(เลือกตัวนำหน้า แล้วพิมพ์เฉพาะเลขหลัง / )</small></label>
           <div style="display:flex;gap:8px"><select id="book_pre" class="ink" style="flex:3 1 0;min-width:0">${prefixes.map(x => `<option value="${esc(x)}" ${x === preSel ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__custom" ${preSel === '__custom' ? 'selected' : ''}>✏️ พิมพ์เลขที่เอง (พิมพ์ทั้งหมด ไม่ใช้ตัวนำหน้า)</option></select>
@@ -195,6 +201,51 @@ async function viewForm(kind, editId) {
   const prefillAt = !edit; $('#book_date_w').append(bd.el); if (!edit) bd.presetMonthYear();
   wireChoice('from_org'); wireChoice('to_org');
   const syncPre = () => { const c = $('#book_pre').value === '__custom'; $('#book_suf').placeholder = c ? 'พิมพ์เลขที่หนังสือเต็มๆ ตามต้นฉบับ' : 'เลขหลัง /'; $('#book_pre').style.flex = c ? '1 1 0' : '3 1 0'; $('#book_suf').style.flex = c ? '3 1 0' : '1 1 0'; }; $('#book_pre').onchange = () => { syncPre(); $('#book_suf').focus(); }; syncPre();
+  /* ---- อ่านจากรูป (OCR) แล้วกรอกให้ ---- */
+  const nsp = s => String(s || '').replace(/\s+/g, '');
+  const mark = el => { const f = el.closest('.field') || el; f.classList.add('ocr-hit'); el.addEventListener('input', () => f.classList.remove('ocr-hit'), { once: true }); el.addEventListener('change', () => f.classList.remove('ocr-hit'), { once: true }); };
+  const setChoice = (id, val) => { const sel = $('#' + id + '_sel'), inp = $('#' + id);
+    const opts = [...sel.options].map(x => x.value).filter(v => v && v !== '__other'); const hit = bestMatch(val, opts);
+    if (hit) { sel.value = hit; inp.hidden = true; } else { sel.value = '__other'; inp.hidden = false; inp.value = val; } mark(sel); };
+  function fillFromOcr(p) {
+    const got = [];
+    if (p.book_no) { const cut = p.book_no.lastIndexOf('/'); const pres = [...$('#book_pre').options].map(o => o.value).filter(v => v !== '__custom');
+      const pre = cut > 0 ? bestMatch(p.book_no.slice(0, cut + 1), pres) : null;
+      if (pre) { $('#book_pre').value = pre; $('#book_suf').value = nsp(p.book_no.slice(cut + 1)); } else { $('#book_pre').value = '__custom'; $('#book_suf').value = p.book_no; }
+      syncPre(); mark($('#book_suf')); got.push('ที่'); }
+    if (p.book_date) { bd.set(p.book_date); mark($('#book_date_w')); got.push('ลงวันที่'); }
+    if (p.from_org) { setChoice('from_org', p.from_org); got.push('จาก'); }
+    if (p.to_org) { setChoice('to_org', p.to_org); got.push('ถึง'); }
+    if (p.subject) { $('#subject').value = p.subject; mark($('#subject')); got.push('เรื่อง'); }
+    return got;
+  }
+  async function runOcr(file) {
+    if (!file || !/^image\//.test(file.type)) { toast('ต้องเป็นไฟล์รูป (JPG, PNG)', 'err'); return; }
+    $('#ocrRun').hidden = false; $('#ocrDrop').classList.add('busy'); $('#ocrPick').disabled = true;
+    const url = URL.createObjectURL(file); $('#ocrThumb').src = url;
+    const prog = (msg, pct, sub) => { if (!$('#ocrMsg')) return; $('#ocrMsg').textContent = msg; $('#ocrBar').style.width = Math.round(pct * 100) + '%'; if (sub !== undefined) $('#ocrSub').textContent = sub; };
+    try {
+      const text = await ocrImage(file, prog);
+      if (!m.isConnected) return;
+      const p = parseThaiDoc(text); const got = fillFromOcr(p);
+      // แนบรูปนี้เป็นไฟล์แนบให้ด้วย
+      const dt = new DataTransfer(); [...$('#files').files].forEach(f => dt.items.add(f)); dt.items.add(new File([file], file.name || `รูปหนังสือ-${Date.now()}.png`, { type: file.type })); $('#files').files = dt.files;
+      $('#ocrRun').innerHTML = `<img src="${url}" alt="" class="ocr-done-img"><div class="grow"><b>${got.length ? `อ่านได้ ${got.length} ช่อง: ${got.join(', ')}` : 'อ่านรูปได้ แต่หาช่องที่ใช้ไม่เจอ'}</b>
+        <small class="muted">${got.length ? 'ช่องที่กรอกให้มีกรอบสีเหลือง <b>ตรวจให้ถูกก่อนกดบันทึกนะ</b> (OCR อาจอ่านผิดบางตัว) · แนบรูปนี้ไว้ในไฟล์แนบให้แล้ว' : 'ลองใช้รูปที่ชัดกว่านี้ ถ่ายตรงๆ ไม่เอียง แสงพอ หรือกรอกเองได้เลย · แนบรูปนี้ไว้ในไฟล์แนบให้แล้ว'}</small>
+        <details><summary>ดูข้อความที่อ่านได้ทั้งหมด</summary><textarea readonly class="ocr-text">${esc(text)}</textarea></details></div>
+        <button type="button" class="btn sm" id="ocrAgain">${ic('image')} ใช้รูปอื่น</button>`;
+      $('#ocrAgain').onclick = () => $('#ocrFile').click();
+      toast(got.length ? `กรอกให้ ${got.length} ช่องแล้ว ตรวจก่อนบันทึกนะ` : 'หาข้อมูลในรูปไม่เจอ ลองรูปที่ชัดกว่านี้', got.length ? 'ok' : 'err', 6000);
+    } catch (e) { toast('อ่านรูปไม่สำเร็จ: ' + e.message, 'err', 8000); $('#ocrRun').hidden = true; }
+    finally { if ($('#ocrDrop')) { $('#ocrDrop').classList.remove('busy'); $('#ocrPick').disabled = false; } }
+  }
+  $('#ocrPick').onclick = () => $('#ocrFile').click();
+  $('#ocrFile').onchange = () => { const f = $('#ocrFile').files[0]; $('#ocrFile').value = ''; if (f) runOcr(f); };
+  const drop = $('#ocrDrop');
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const f = [...(e.dataTransfer.files || [])].find(x => /^image\//.test(x.type)); if (f) runOcr(f); else toast('ลากมาเฉพาะไฟล์รูปนะ', 'err'); };
+  window.__ocrPaste = e => { if (!m.isConnected) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); runOcr(f); } };
   const bookNo = () => { const suf = $('#book_suf').value.trim(); return suf ? (($('#book_pre').value === '__custom' ? '' : $('#book_pre').value) + suf) : ''; };
   const dt = {};
   const setT = (w, v) => { const [h, mi] = (v || '').split(':'); $(`#${w}_hh`).value = h || ''; $(`#${w}_mm`).value = mi || ''; };
@@ -246,6 +297,37 @@ async function viewForm(kind, editId) {
     } catch (e) { toast(e.message, 'err', 7000); $('#msg').textContent = ''; saving = false; $('#save').disabled = false; }
   };
 }
+
+/* ---------- อ่านตัวอักษรจากรูป (OCR) ทำงานในเครื่องนี้ ไม่ใช้อินเทอร์เน็ต ---------- */
+let ocrWorkerP = null, ocrProgress = null;
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('โหลดตัวอ่านรูปไม่สำเร็จ')); document.head.append(s); }); }
+function getOcrWorker() {
+  if (!ocrWorkerP) ocrWorkerP = (async () => {
+    if (!window.Tesseract) await loadScript('/ocr/tesseract.min.js');
+    return Tesseract.createWorker('tha', 1, { workerPath: '/ocr/worker.min.js', corePath: '/ocr/', langPath: '/ocr/lang', workerBlobURL: false, cacheMethod: 'none', logger: x => ocrProgress && ocrProgress(x) });
+  })().catch(e => { ocrWorkerP = null; throw e; });
+  return ocrWorkerP;
+}
+// เตรียมรูป: หมุนตามกล้อง ขยายให้ตัวหนังสือใหญ่พอ ทำเป็นขาวดำ เพิ่มความคม
+async function prepImage(file) {
+  let bmp; try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { bmp = await createImageBitmap(file); }
+  const long = Math.max(bmp.width, bmp.height); const sc = long < 2200 ? Math.min(3, 2400 / long) : long > 3600 ? 3200 / long : 1;
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.filter = 'grayscale(1) contrast(1.35)'; g.imageSmoothingQuality = 'high'; g.drawImage(bmp, 0, 0, c.width, c.height);
+  return c;
+}
+async function ocrImage(file, prog) {
+  const TH = { 'loading tesseract core': 'กำลังเตรียมตัวอ่าน…', 'initializing tesseract': 'กำลังเตรียมตัวอ่าน…', 'loading language traineddata': 'กำลังโหลดภาษาไทย…', 'initializing api': 'กำลังเตรียมตัวอ่าน…', 'recognizing text': 'กำลังอ่านรูป…' };
+  ocrProgress = x => prog((TH[x.status] || 'กำลังเตรียม…') + (x.status === 'recognizing text' ? ` ${Math.round(x.progress * 100)}%` : ''), x.status === 'recognizing text' ? x.progress : 0.05, x.status === 'recognizing text' ? 'รูปใหญ่/ตัวหนังสือเยอะ อาจใช้เวลา 10–30 วินาที' : undefined);
+  prog('กำลังเตรียมรูป…', 0.02);
+  const canvas = await prepImage(file);
+  const w = await getOcrWorker();
+  const r = await w.recognize(canvas, {}, { text: true, blocks: true });
+  let text = r.data.text || '';
+  try { prog('กำลังตรวจตัวเลขไทย…', 1); const fx = await fixThaiDigits(r.data.blocks, canvas); if (fx && fx.text.trim()) text = fx.text; } catch (e) { console.warn('ตรวจตัวเลขไม่สำเร็จ', e); }
+  return text;
+}
+document.addEventListener('paste', e => { if (window.__ocrPaste && $('#ocrbox')) window.__ocrPaste(e); });
 
 /* ---------- ตารางรายการ + ค้นหา ---------- */
 async function viewList(kind) {
