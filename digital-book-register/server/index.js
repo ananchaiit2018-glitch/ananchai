@@ -333,7 +333,7 @@ function createApp() {
   });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'ไม่พบบริการที่ร้องขอ' }));
-  app.use(express.static(path.join(cfg.ROOT, 'public'), { maxAge: 0, etag: true }));
+  app.use(express.static(path.join(cfg.ROOT, 'public'), { maxAge: 0, etag: true, setHeaders: (res, f) => { if (f.endsWith('.mjs')) res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); } }));
 
   app.use((err, req, res, next) => {   // eslint-disable-line no-unused-vars
     if (err instanceof U.HttpError) return res.status(err.status).json({ error: err.message, code: err.code });

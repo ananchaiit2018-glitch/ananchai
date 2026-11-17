@@ -23,10 +23,11 @@
     const t = toArabic(text);
     for (let i = 0; i < 12; i++) {
       for (const name of MONTHS[i]) {
-        const re = new RegExp('(\\d{1,2})\\s*' + loose(name) + '\\s*(?:พ\\.?\\s*ศ\\.?\\s*)?(\\d{4}|\\d{2})', 'u');
+        const re = new RegExp('(\\d{1,3})\\s*' + loose(name) + '\\s*(?:พ\\.?\\s*ศ\\.?\\s*)?(\\d{4}|\\d{2})', 'u');
         const m = t.match(re);
         if (m) {
-          const d = +m[1]; let y = +m[2]; if (y < 100) y += 2500; if (y > 2400) y -= 543;
+          // วันที่อ่านเกินมา 1 ตัว (เช่น ๑๔๔) -> ลองสองหลักแรก แล้วสองหลักท้าย
+          const ds = m[1]; const d = [+ds, +ds.slice(0, 2), +ds.slice(-2)].find(x => x >= 1 && x <= 31) || 0; let y = +m[2]; if (y < 100) y += 2500; if (y > 2400) y -= 543;
           const now = new Date().getFullYear(); if (Math.abs(y - now) > 1) y = now;
           if (d >= 1 && d <= 31 && y > 1900 && y < 2200) return `${y}-${String(i + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         }

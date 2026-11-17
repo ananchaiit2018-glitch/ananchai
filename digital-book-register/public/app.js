@@ -172,8 +172,8 @@ async function viewForm(kind, editId) {
         <small class="muted">${edit ? 'เลขทะเบียนแก้ไขไม่ได้' : 'ระบบออกเลขให้อัตโนมัติเมื่อกดบันทึก (เลขจริงอาจเปลี่ยนถ้ามีเครื่องอื่นบันทึกก่อน)'} · ไม่ใช่เลขที่หนังสือราชการ</small></div>
       <div class="ocrbox" id="ocrbox">
         <div class="ocr-drop" id="ocrDrop"><span class="ocr-ic">${ic('scan')}</span>
-          <div class="grow"><b>มีรูปหนังสือไหม? ให้โปรแกรมอ่านแล้วกรอกให้</b><small>ลากรูปมาวางตรงนี้ · กดเลือกรูป · หรือกด <kbd>Ctrl</kbd>+<kbd>V</kbd> วางรูป — อ่านในเครื่องนี้ ไม่ส่งออกอินเทอร์เน็ต</small></div>
-          <button type="button" class="btn primary" id="ocrPick">${ic('image')} เลือกรูป</button><input type="file" id="ocrFile" accept="image/*" hidden></div>
+          <div class="grow"><b>มีไฟล์หนังสือไหม? ให้โปรแกรมอ่านแล้วกรอกให้</b><small>PDF จากระบบสารบรรณอิเล็กทรอนิกส์ หรือรูปสแกน/ถ่าย · ลากมาวาง · กดเลือกไฟล์ · หรือ <kbd>Ctrl</kbd>+<kbd>V</kbd> — อ่านในเครื่องนี้ ไม่ส่งออกอินเทอร์เน็ต</small></div>
+          <button type="button" class="btn primary" id="ocrPick">${ic('image')} เลือกไฟล์</button><input type="file" id="ocrFile" accept="image/*,.pdf,application/pdf" hidden></div>
         <div class="ocr-run" id="ocrRun" hidden><img id="ocrThumb" alt=""><div class="grow"><b id="ocrMsg">กำลังเตรียมตัวอ่าน…</b><div class="ocr-bar"><i id="ocrBar"></i></div><small class="muted" id="ocrSub">ครั้งแรกอาจใช้เวลาสักครู่</small></div></div>
       </div>
       <div class="sec"><span>1</span>ข้อมูลหนังสือ <small>เรียงตามช่องในทะเบียน</small></div>
@@ -218,21 +218,37 @@ async function viewForm(kind, editId) {
     return got;
   }
   async function runOcr(file) {
-    if (!file || !/^image\//.test(file.type)) { toast('ต้องเป็นไฟล์รูป (JPG, PNG)', 'err'); return; }
+    const isPdf = file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || ''));
+    if (!file || (!isPdf && !/^image\//.test(file.type))) { toast('ต้องเป็นไฟล์ PDF หรือรูป (JPG, PNG)', 'err'); return; }
     $('#ocrRun').hidden = false; $('#ocrDrop').classList.add('busy'); $('#ocrPick').disabled = true;
-    const url = URL.createObjectURL(file); $('#ocrThumb').src = url;
+    let url = isPdf ? '' : URL.createObjectURL(file); if (url) $('#ocrThumb').src = url;
+    let how = 'ocr';
     const prog = (msg, pct, sub) => { if (!$('#ocrMsg')) return; $('#ocrMsg').textContent = msg; $('#ocrBar').style.width = Math.round(pct * 100) + '%'; if (sub !== undefined) $('#ocrSub').textContent = sub; };
     try {
-      const text = await ocrImage(file, prog);
+      let text;
+      if (isPdf) {
+        prog('กำลังเปิดไฟล์ PDF…', 0.05);
+        const r = await readPdf(file);
+        url = r.thumb; $('#ocrThumb').src = url;
+        if (r.text) {
+          text = r.text; how = 'pdf';
+          const garbled = /[\x00-\x08\x0e-\x1f]/.test(text) || (text.match(/[ก-๛][!"#$%&;<=>?@^_`{|}~0-9][ก-๛]/g) || []).length > 3;
+          if (garbled || parseThaiDoc(text).found.length < 3) {   // ฟอนต์ใน PDF บางไฟล์ถอดเป็นตัวอักษรไม่ได้ -> อ่านจากภาพหน้าที่เรนเดอร์คมชัด
+            const t2 = await ocrImage(await r.page2400(), prog);
+            if (parseThaiDoc(t2).found.length >= parseThaiDoc(text).found.length) { text = t2; how = 'pdfocr'; }
+          }
+        } else { how = 'pdfscan'; text = await ocrImage(r.canvas, prog); }
+      } else text = await ocrImage(file, prog);
       if (!m.isConnected) return;
       const p = parseThaiDoc(text); const got = fillFromOcr(p);
       // แนบรูปนี้เป็นไฟล์แนบให้ด้วย
       const dt = new DataTransfer(); [...$('#files').files].forEach(f => dt.items.add(f)); dt.items.add(new File([file], file.name || `รูปหนังสือ-${Date.now()}.png`, { type: file.type })); $('#files').files = dt.files;
       $('#ocrRun').innerHTML = `<img src="${url}" alt="" class="ocr-done-img"><div class="grow"><b>${got.length ? `อ่านได้ ${got.length} ช่อง: ${got.join(', ')}` : 'อ่านรูปได้ แต่หาช่องที่ใช้ไม่เจอ'}</b>
-        <small class="muted">${got.length ? 'ช่องที่กรอกให้มีกรอบสีเหลือง <b>ตรวจให้ถูกก่อนกดบันทึกนะ</b> (OCR อาจอ่านผิดบางตัว) · แนบรูปนี้ไว้ในไฟล์แนบให้แล้ว' : 'ลองใช้รูปที่ชัดกว่านี้ ถ่ายตรงๆ ไม่เอียง แสงพอ หรือกรอกเองได้เลย · แนบรูปนี้ไว้ในไฟล์แนบให้แล้ว'}</small>
+        <small class="muted">${how === 'pdf' ? '📄 อ่านจากตัวอักษรใน PDF โดยตรง (ตรงตามต้นฉบับ) · ' : how === 'pdfscan' ? '📄 PDF นี้เป็นภาพสแกน จึงอ่านจากภาพ · ' : how === 'pdfocr' ? '📄 ฟอนต์ใน PDF นี้ถอดเป็นตัวอักษรไม่ได้ จึงอ่านจากภาพของหน้า PDF · ' : ''}${got.length ? `ช่องที่กรอกให้มีกรอบสีเหลือง <b>ตรวจให้ถูกก่อนกดบันทึกนะ</b>${how === 'pdf' ? '' : ' (อ่านจากภาพ อาจผิดบางตัว)'} · แนบไฟล์นี้ไว้ในไฟล์แนบให้แล้ว` : 'หาข้อมูลที่ใช้ไม่เจอ กรอกเองได้เลย · แนบไฟล์นี้ไว้ในไฟล์แนบให้แล้ว'}</small>
         <details><summary>ดูข้อความที่อ่านได้ทั้งหมด</summary><textarea readonly class="ocr-text">${esc(text)}</textarea></details></div>
         <button type="button" class="btn sm" id="ocrAgain">${ic('image')} ใช้รูปอื่น</button>`;
       $('#ocrAgain').onclick = () => $('#ocrFile').click();
+      $('#ocrAgain').innerHTML = `${ic('image')} ใช้ไฟล์อื่น`;
       toast(got.length ? `กรอกให้ ${got.length} ช่องแล้ว ตรวจก่อนบันทึกนะ` : 'หาข้อมูลในรูปไม่เจอ ลองรูปที่ชัดกว่านี้', got.length ? 'ok' : 'err', 6000);
     } catch (e) { toast('อ่านรูปไม่สำเร็จ: ' + e.message, 'err', 8000); $('#ocrRun').hidden = true; }
     finally { if ($('#ocrDrop')) { $('#ocrDrop').classList.remove('busy'); $('#ocrPick').disabled = false; } }
@@ -242,8 +258,9 @@ async function viewForm(kind, editId) {
   const drop = $('#ocrDrop');
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
   drop.ondragleave = () => drop.classList.remove('over');
-  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const f = [...(e.dataTransfer.files || [])].find(x => /^image\//.test(x.type)); if (f) runOcr(f); else toast('ลากมาเฉพาะไฟล์รูปนะ', 'err'); };
-  window.__ocrPaste = e => { if (!m.isConnected) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); runOcr(f); } };
+  const okFile = x => /^image\//.test(x.type) || x.type === 'application/pdf' || /\.pdf$/i.test(x.name || '');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const f = [...(e.dataTransfer.files || [])].find(okFile); if (f) runOcr(f); else toast('ลากมาเฉพาะไฟล์ PDF หรือรูปนะ', 'err'); };
+  window.__ocrPaste = e => { if (!m.isConnected) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(okFile); if (f) { e.preventDefault(); runOcr(f); } };
   const bookNo = () => { const suf = $('#book_suf').value.trim(); return suf ? (($('#book_pre').value === '__custom' ? '' : $('#book_pre').value) + suf) : ''; };
   const dt = {};
   const setT = (w, v) => { const [h, mi] = (v || '').split(':'); $(`#${w}_hh`).value = h || ''; $(`#${w}_mm`).value = mi || ''; };
@@ -329,6 +346,38 @@ async function ocrImage(file, prog) {
   return text;
 }
 document.addEventListener('paste', e => { if (window.__ocrPaste && $('#ocrbox')) window.__ocrPaste(e); });
+
+/* ---------- อ่านไฟล์ PDF (หนังสืออิเล็กทรอนิกส์) ด้วย pdf.js ในเครื่อง ---------- */
+let pdfjsP = null;
+function getPdfjs() {
+  if (!pdfjsP) pdfjsP = import('/pdfjs/pdf.min.mjs').then(m => { m.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs'; return m; }).catch(e => { pdfjsP = null; throw new Error('โหลดตัวอ่าน PDF ไม่สำเร็จ'); });
+  return pdfjsP;
+}
+// PDF จาก Word + ฟอนต์ TH Sarabun มักเก็บสระบน/วรรณยุกต์เป็นรหัสพิเศษ (U+F700–F71A) -> แปลงกลับเป็นอักษรไทยปกติ
+const THAI_PUA = { '': 'ฐ', '': 'ิ', '': 'ี', '': 'ึ', '': 'ื', '': '่', '': '้', '': '๊', '': '๋', '': '์',
+  '': '่', '': '้', '': '๊', '': '๋', '': '์', '': 'ญ', '': 'ั', '': 'ํ', '': '็', '': '่', '': '้', '': '๊', '': '๋', '': '์', '': 'ุ', '': 'ู', '': 'ฺ' };
+const fixThaiPua = s => s.replace(/[-]/g, c => THAI_PUA[c] || '');
+// คืน { text } ถ้า PDF มีตัวอักษร หรือ { canvas } (ภาพหน้าแรก) ถ้าเป็น PDF สแกน + thumb ภาพย่อหน้าแรก
+async function readPdf(file) {
+  const pdfjs = await getPdfjs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+  const page = await doc.getPage(1);
+  const render = async longSide => { const v0 = page.getViewport({ scale: 1 }); const vp = page.getViewport({ scale: longSide / Math.max(v0.width, v0.height) });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: g, viewport: vp }).promise; return c; };
+  const thumb = (await render(300)).toDataURL('image/png');
+  const tc = await page.getTextContent();
+  const items = tc.items.filter(i => i.str && i.str.trim()).map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width, h: Math.abs(i.transform[3]) || i.height || 10 }));
+  const page2400 = () => render(2400);
+  if (items.reduce((n, i) => n + i.s.replace(/\s/g, '').length, 0) < 30) return { canvas: await page2400(), thumb };   // แทบไม่มีตัวอักษร = PDF สแกน
+  // รวมเป็นบรรทัดตามตำแหน่งแนวตั้ง แล้วเรียงซ้าย->ขวา
+  items.sort((a, b) => b.y - a.y || a.x - b.x);
+  const lines = [];
+  for (const it of items) { const ln = lines.find(l => Math.abs(l.y - it.y) < Math.min(l.h, it.h) * 0.5); if (ln) ln.items.push(it); else lines.push({ y: it.y, h: it.h, items: [it] }); }
+  const text = lines.sort((a, b) => b.y - a.y).map(l => { l.items.sort((a, b) => a.x - b.x); let out = '', end = null;
+    for (const it of l.items) { if (end !== null && it.x - end > it.h * 0.18) out += ' '; out += it.s; end = it.x + it.w; } return out; }).join('\n');
+  return { text: fixThaiPua(text), thumb, page2400 };
+}
 
 /* ---------- ตารางรายการ + ค้นหา ---------- */
 async function viewList(kind) {

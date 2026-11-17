@@ -26,3 +26,8 @@ test('จับคู่กับตัวเลือกที่ตั้ง�
   assert.equal(bestMatch('ผบ.มว.ฉกุตชด.๕๕๕๑', opts), 'ผบ.มว.ฉก.ตชด.๔๔๔๑');
   assert.equal(bestMatch('กองกำกับการ ๔', opts), null);
 });
+test('วันที่อ่านเกินมา 1 หลัก (๑๔๔ พฤศจิกายน) -> ใช้ ๑๔', () => {
+  const { findDate } = require('../public/ocrparse.js');
+  assert.equal(findDate(`วันที่ ๑๔๔ พฤศจิกายน ${Y + 543}`), `${Y}-11-14`);
+  assert.equal(findDate(`วันที่ ๙ ธันวาคม ${Y + 543}`), `${Y}-12-09`);
+});
