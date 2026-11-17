@@ -539,8 +539,10 @@ async function viewSettings() {
       <div class="field"><label class="f">สีตัวอักษรข้อมูลที่กรอก</label><div class="row"><input type="color" id="data_color" value="${esc(s.data_color)}" style="width:60px;padding:2px"><span class="muted">ค่าตั้งต้น #174EA6 (น้ำเงินหมึกปากกา)</span></div></div></div></div>
   <div class="card"><h2>ความปลอดภัย</h2><p class="muted">${S.st.has_password ? 'ตั้งรหัสผ่านเข้าใช้งานไว้แล้ว' : 'ยังไม่ได้ตั้งรหัสผ่านเข้าใช้งาน (แนะนำให้ตั้ง โดยเฉพาะเมื่อให้เครื่องอื่นใช้งานร่วมกัน)'}</p>
     <div class="grid g3">${S.st.has_password ? '<div class="field"><label class="f">รหัสผ่านปัจจุบัน</label><input type="password" id="pw_cur" autocomplete="off"></div>' : ''}
-    <div class="field"><label class="f">รหัสผ่านใหม่ ${S.st.has_password ? '<small>(เว้นว่างเพื่อลบรหัสผ่าน)</small>' : ''}</label><input type="password" id="pw_new" autocomplete="new-password"></div>
-    <div class="field"><label class="f">&nbsp;</label><button class="btn" id="pw_save">บันทึกรหัสผ่าน</button></div></div>
+    <div class="field"><label class="f">${S.st.has_password ? 'รหัสผ่านใหม่' : 'ตั้งรหัสผ่าน'} <small>(อย่างน้อย 4 ตัว)</small></label><input type="password" id="pw_new" autocomplete="new-password"></div>
+    <div class="field"><label class="f">พิมพ์รหัสผ่านอีกครั้ง</label><input type="password" id="pw_new2" autocomplete="new-password"></div></div>
+    <div class="row"><button class="btn primary" id="pw_save">${ic('save')} ${S.st.has_password ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน'}</button>${S.st.has_password ? '<button class="btn danger" id="pw_del">ลบรหัสผ่าน (เข้าได้โดยไม่ต้องใช้รหัส)</button>' : ''}</div>
+    <div class="notice warn" style="margin-top:12px"><b>ลืมรหัสผ่าน?</b> ที่เครื่องหลัก เปิดโฟลเดอร์โปรแกรม แล้วดับเบิลคลิก <code>reset-password.bat</code> → พิมพ์ Y → รหัสผ่านถูกล้าง ข้อมูลทะเบียนอยู่ครบ แล้วค่อยตั้งรหัสใหม่</div>
     <p class="muted" style="font-size:.9rem">ข้อมูลทั้งหมดเก็บที่: <code>${esc(S.st.data_dir)}</code> (ไฟล์แนบเข้าถึงได้ผ่านโปรแกรมเท่านั้น ไม่ได้อยู่ในโฟลเดอร์สาธารณะ)</p></div>
   <div class="card dz"><h2>${ic('refresh')} เริ่มต้นใหม่ (ล้างข้อมูล)</h2>
     <p class="muted" style="margin-top:-4px">ใช้เมื่อย้ายหน่วย / ส่งต่อเครื่องให้หน่วยอื่น / ล้างข้อมูลที่ลองบันทึกเล่น</p>
@@ -588,8 +590,18 @@ async function viewSettings() {
   $$('[data-fontdel]').forEach(b => b.onclick = async () => { if (await confirmBox('ลบฟอนต์', 'ลบไฟล์ฟอนต์นี้?', 'ลบ', true)) { await api('/api/settings/font/' + b.dataset.fontdel, { method: 'DELETE' }); await loadState(); viewSettings(); } });
   $('#logo').onchange = async e => { if (!e.target.files[0]) return; const fd = new FormData(); fd.append('file', e.target.files[0]); try { await api('/api/settings/logo', { method: 'POST', body: fd }); toast('อัปโหลดโลโก้แล้ว', 'ok'); await loadState(); viewSettings(); } catch (er) { toast(er.message, 'err'); } };
   $('#logodel').onclick = async () => { await api('/api/settings/logo', { method: 'DELETE' }); await loadState(); viewSettings(); };
+  const cur = () => ($('#pw_cur') ? $('#pw_cur').value : '');
   $('#pw_save').onclick = async () => {
-    try { const r = await api('/api/settings/password', { json: { current: $('#pw_cur') ? $('#pw_cur').value : '', next: $('#pw_new').value } }); toast(r.has_password ? 'ตั้งรหัสผ่านแล้ว ต้องเข้าสู่ระบบใหม่' : 'ลบรหัสผ่านแล้ว', 'ok'); setTimeout(() => location.reload(), 800); } catch (e) { toast(e.message, 'err'); }
+    const n1 = $('#pw_new').value, n2 = $('#pw_new2').value;
+    if (S.st.has_password && !cur()) { toast('ใส่รหัสผ่านปัจจุบันก่อน', 'err'); $('#pw_cur').focus(); return; }
+    if (n1.length < 4) { toast('รหัสผ่านใหม่ต้องยาวอย่างน้อย 4 ตัวอักษร', 'err'); $('#pw_new').focus(); return; }
+    if (n1 !== n2) { toast('รหัสผ่านสองช่องไม่ตรงกัน ลองพิมพ์ใหม่', 'err'); $('#pw_new2').focus(); return; }
+    try { await api('/api/settings/password', { json: { current: cur(), next: n1 } }); toast('ตั้งรหัสผ่านแล้ว ต้องเข้าสู่ระบบใหม่ (จดรหัสเก็บไว้ในที่ปลอดภัยด้วย)', 'ok', 6000); setTimeout(() => location.reload(), 1500); } catch (e) { toast(e.message, 'err'); }
+  };
+  if ($('#pw_del')) $('#pw_del').onclick = async () => {
+    if (!cur()) { toast('ใส่รหัสผ่านปัจจุบันก่อน แล้วค่อยกดลบ', 'err'); $('#pw_cur').focus(); return; }
+    if (!await confirmBox('ลบรหัสผ่าน', '<p>หลังลบ ใครเปิดโปรแกรมก็เข้าได้เลยโดยไม่ต้องใส่รหัสผ่าน</p><p class="muted">ถ้าเครื่องนี้มีคนอื่นใช้ร่วมด้วย แนะนำให้มีรหัสผ่านไว้</p>', 'ลบรหัสผ่าน', true)) return;
+    try { await api('/api/settings/password', { json: { current: cur(), next: '' } }); toast('ลบรหัสผ่านแล้ว', 'ok'); setTimeout(() => location.reload(), 800); } catch (e) { toast(e.message, 'err'); }
   };
 }
 
@@ -865,8 +877,9 @@ async function viewBackup() {
 
 /* ---------- เข้าสู่ระบบ ---------- */
 function viewLogin() {
-  $('#app').innerHTML = `<div class="login"><div class="card"><h1 style="font-size:1.4rem">ระบบทะเบียนหนังสือรับ–ส่ง</h1><p class="muted">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
-    <form id="lf"><div class="field"><input type="password" id="pw" placeholder="รหัสผ่าน" autofocus></div><button class="btn primary big" style="width:100%">เข้าสู่ระบบ</button></form></div></div>`;
+  $('#app').innerHTML = `<div class="welcome"><div class="welcome-card" style="max-width:420px"><img src="/icon.svg" alt="" class="welcome-logo"><h1 style="font-size:1.4rem;white-space:nowrap">ระบบทะเบียนหนังสือรับ–ส่ง</h1><p class="muted">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
+    <form id="lf"><div class="field"><input type="password" id="pw" placeholder="รหัสผ่าน" autofocus></div><button class="btn primary big" style="width:100%">เข้าสู่ระบบ</button></form>
+    <details style="margin-top:14px;text-align:left"><summary class="muted" style="cursor:pointer;text-align:center">ลืมรหัสผ่าน?</summary><p class="muted" style="font-size:.92rem">ที่<b>เครื่องหลัก</b> (เครื่องที่ติดตั้งโปรแกรม) เปิดโฟลเดอร์โปรแกรม แล้วดับเบิลคลิก <code>reset-password.bat</code> → พิมพ์ Y → รีเฟรชหน้านี้ จะเข้าได้โดยไม่ต้องใช้รหัส ข้อมูลทะเบียนไม่หาย</p></details></div></div>`;
   $('#app').append(themeButton());
   $('#lf').onsubmit = async e => { e.preventDefault(); try { await api('/api/login', { json: { password: $('#pw').value } }); boot(); } catch (er) { toast(er.message, 'err'); } };
 }
