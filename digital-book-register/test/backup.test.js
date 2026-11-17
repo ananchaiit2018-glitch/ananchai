@@ -64,3 +64,11 @@ test('ไฟล์ Excel อัปเดตอัตโนมัติ: ไฟ�
   db.setSetting('live_excel', '0'); const t = fs.statSync(s2.file).mtimeMs; await live.write(); assert.equal(fs.statSync(s2.file).mtimeMs, t);
   db.setSetting('live_excel', '1');
 });
+test('อัปเดตโปรแกรม (ไฟล์โปรแกรมเปลี่ยน) -> สำรองข้อมูลก่อนอัตโนมัติ / เปิดซ้ำเวอร์ชันเดิมไม่สำรอง', () => {
+  const uc = require('../server/updatecheck'); const activity = require('../server/activity');
+  db.setSetting('code_fp', ''); assert.equal(uc.checkAndBackup(backup, activity).updated, false);      // ครั้งแรก: จำลายนิ้วมือ
+  assert.equal(uc.checkAndBackup(backup, activity).updated, false);                                    // เวอร์ชันเดิม
+  db.setSetting('code_fp', 'เวอร์ชันเก่า'); const r = uc.checkAndBackup(backup, activity);               // จำลองว่าไฟล์โปรแกรมเปลี่ยน
+  assert.ok(r.updated && r.backup.ok && /^before-update-/.test(r.backup.name)); assert.ok(fs.existsSync(path.join(backup.backupDir(), r.backup.name)));
+  assert.equal(db.getSettings().code_fp, uc.fingerprint());
+});

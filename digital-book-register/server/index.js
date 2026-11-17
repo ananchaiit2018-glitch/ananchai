@@ -349,6 +349,8 @@ function createApp() {
 function start() {
   db.open();
   fonts.installBundled();
+  // อัปเดตโปรแกรมมาใหม่? -> สำรองข้อมูลให้ก่อนอัตโนมัติ
+  try { const u = require('./updatecheck').checkAndBackup(backup, activity); if (u.updated) console.log(u.backup.ok ? '[อัปเดตโปรแกรม] สำรองข้อมูลก่อนอัปเดต: ' + (u.backup.name || '-') : '[อัปเดตโปรแกรม] สำรองไม่สำเร็จ: ' + u.backup.error); } catch (e) { console.error(e); }
   const app = createApp();
   activity.log('app_start', `โปรแกรมเริ่มทำงาน (รุ่น ${cfg.VERSION || ''})`, { actor: 'ระบบ', machine: 'เครื่องหลัก' });
   const logAuto = auto => { if (auto) activity.log('backup_auto', auto.ok ? `${auto.name}${auto.excel ? ' + ' + auto.excel : ''}` : `ไม่สำเร็จ ${auto.error}`, { actor: 'ระบบ', machine: 'เครื่องหลัก' }); return auto; };
