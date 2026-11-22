@@ -74,7 +74,7 @@ def parse_thai_date(text: str, today: date | None = None) -> tuple[str, str] | N
 
 
 TH_DIGIT_RE = re.compile(r"[๐-๙]")
-NOTE_DIGITS = CHECK + " — ตัวเลขไทยที่อ่านจากภาพอาจผิด (เช่น ๔/๕, ๓/๙)"
+NOTE_DIGITS = CHECK + " — ตัวเลขจากภาพอาจผิด"
 
 
 def extract(lines: list[OcrLine], today: date | None = None, from_image: bool = False) -> dict[str, dict]:

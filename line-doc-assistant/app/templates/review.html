@@ -27,7 +27,7 @@
         {% set e = ex.get(k, {}) %}{% set v = fin.get(k) if k in fin else e.get('value', '') %}
         <div class="field {{ 'check' if e.get('check', true) and editable and not (k in fin) }}">
           <label class="f">{{ FIELDS[k] }}{% if k == 'subject' %} <small>(ระบบทะเบียนเดิมบังคับกรอก)</small>{% endif %}
-            {% if e.get('check', true) %}<span class="flag">{{ e.get('note') or 'กรุณาตรวจสอบ' }}</span>{% elif e.get('value') %}<span class="okflag">อ่านได้ {{ e.get('conf', 0)|round|int }}%</span>{% endif %}</label>
+            {% if e.get('check', true) %}{% set why = (e.get('note') or '').split(' — ', 1)[-1] if ' — ' in (e.get('note') or '') else '' %}<span class="flag" title="{{ e.get('note') or 'กรุณาตรวจสอบ' }}">กรุณาตรวจสอบ{% if why %}<span class="why"> · {{ why }}</span>{% endif %}</span>{% elif e.get('value') %}<span class="okflag">อ่านได้ {{ e.get('conf', 0)|round|int }}%</span>{% endif %}</label>
           {% if k == 'book_date' %}<input type="date" name="book_date" value="{{ v }}" {{ '' if editable else 'readonly' }}>
             {% if e.get('display') %}<small class="muted">ในเอกสาร: {{ e.get('display') }}</small>{% endif %}
           {% elif k == 'subject' %}<textarea name="subject" rows="2" {{ '' if editable else 'readonly' }}>{{ v }}</textarea>
