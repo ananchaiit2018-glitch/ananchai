@@ -22,9 +22,7 @@
       {{ {'pdf-text':'อ่านจากตัวอักษรใน PDF โดยตรง (ตรงตามต้นฉบับ)','pdf-ocr':'อ่านจากภาพของหน้า PDF ด้วย OCR — ตรวจตัวเลขให้ดี','image-ocr':'อ่านจากรูปด้วย OCR — ตรวจตัวเลขให้ดี','failed':'อ่านข้อมูลไม่ได้ — กรุณากรอกเองทุกช่อง'}[j.ocr_method] }}</div>{% endif %}
 
     <form class="card" method="post" action="/review/{{ j.id }}" id="rf">
-      <div class="field"><label class="f">ประเภท</label><div class="row">
-        <label><input type="radio" name="kind" value="in" {{ 'checked' if (fin.get('kind') or 'in') == 'in' }} {{ '' if editable else 'disabled' }}> หนังสือรับ</label>
-        <label><input type="radio" name="kind" value="out" {{ 'checked' if fin.get('kind') == 'out' }} {{ '' if editable else 'disabled' }}> หนังสือส่ง</label></div></div>
+      <div class="field"><span class="chip" style="font-size:.95rem;padding:3px 12px">📥 ลงทะเบียนหนังสือรับ</span></div>
       {% for k in ['book_no', 'book_date', 'sender', 'receiver', 'subject'] %}
         {% set e = ex.get(k, {}) %}{% set v = fin.get(k) if k in fin else e.get('value', '') %}
         <div class="field {{ 'check' if e.get('check', true) and editable and not (k in fin) }}">
@@ -46,8 +44,8 @@
       {% if editable %}
       <div class="actions">
         <button class="btn green" type="button" onclick="go('confirm')">✓ ยืนยัน</button>
-        <button class="btn blue" type="button" onclick="go('save')">✎ บันทึกการแก้ไข</button>
-        <span class="grow"></span>
+        <button class="btn blue" type="button" onclick="go('save')">✎ <span class="hide-sm">บันทึก</span>แก้ไข</button>
+        <span class="grow hide-sm"></span>
         <button class="btn red" type="button" onclick="go('cancel')">✕ ยกเลิก</button>
       </div>
       <p class="muted" style="font-size:.88rem;margin:8px 0 0">กด "ยืนยัน" แล้ว คอมสำนักงานจะนำข้อมูลนี้ไปกรอกในเว็บทะเบียนเดิม — ยังไม่บันทึกจนกว่าจะยืนยัน</p>
@@ -73,7 +71,7 @@
 <script>
 function go(a){
   if(a==='cancel'){const r=prompt('เหตุผลที่ยกเลิก');if(r===null)return;document.getElementById('reason').value=r;}
-  if(a==='confirm'&&!confirm('ยืนยันข้อมูลนี้ และส่งให้คอมสำนักงานบันทึกลงทะเบียน?'))return;
+  if(a==='confirm'&&!confirm('ยืนยันข้อมูลนี้ และส่งให้คอมสำนักงานลงทะเบียนหนังสือรับ?'))return;
   document.getElementById('act').value=a;document.getElementById('rf').submit();
 }
 </script>

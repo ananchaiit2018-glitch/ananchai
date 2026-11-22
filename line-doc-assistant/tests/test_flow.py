@@ -109,6 +109,15 @@ def test_confirm_requires_complete_fields_and_only_once(env):
     assert j["status"] == "confirmed" and j["confirmed_by"] == "admin"
 
 
+def test_line_jobs_are_always_incoming(env):
+    jid = _review_job(env)
+    env["svc"].confirm(jid, _confirm_values(kind="out"), "admin")   # แม้ฟอร์มส่ง out มา ก็ต้องเป็นหนังสือรับ
+    assert json.loads(env["db"].one("SELECT final_json FROM jobs WHERE id=?", jid)["final_json"])["kind"] == "in"
+    _agent(env).run_once()
+    ledger = json.loads((env["tmp"] / "office" / "ทะเบียนจำลอง.json").read_text(encoding="utf-8"))
+    assert ledger["entries"][0]["kind"] == "in"
+
+
 def test_nothing_reaches_register_before_confirmation(env):
     _review_job(env)
     ag = _agent(env)

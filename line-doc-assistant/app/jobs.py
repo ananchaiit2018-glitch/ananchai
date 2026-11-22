@@ -130,7 +130,7 @@ class Service:
     # ---------- ตรวจสอบ / แก้ไข / ยืนยัน / ยกเลิก ----------
     def _clean_values(self, values: dict) -> dict:
         out = {k: str(values.get(k, "") or "").strip()[:500] for k in ("book_no", "book_date", "sender", "receiver", "subject", "officer", "kind", "remark")}
-        out["kind"] = "out" if out["kind"] == "out" else "in"
+        out["kind"] = "in"  # LINE ใช้ลงทะเบียนหนังสือรับเท่านั้น (หนังสือส่งทำที่คอมสำนักงานตามเดิม)
         return out
 
     def save_edits(self, jid: str, values: dict, actor: str) -> None:

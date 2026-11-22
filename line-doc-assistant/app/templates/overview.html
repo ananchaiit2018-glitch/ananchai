@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="top"><div><h1>ภาพรวม</h1><div class="sub">LINE → อ่านเอกสาร → เจ้าหน้าที่ตรวจสอบ → ยืนยัน → คอมสำนักงานบันทึกลงทะเบียน → แจ้ง LINE</div></div></div>
+<div class="top"><div><h1>ภาพรวม</h1><div class="sub">LINE → อ่านเอกสาร → เจ้าหน้าที่ตรวจสอบ → ยืนยัน → คอมสำนักงานลงทะเบียนรับ → แจ้ง LINE</div></div></div>
 <div class="grid g4">
   <div class="card stat"><span class="ic b">📥</span><div><div class="l">รับเอกสารวันนี้</div><div class="n">{{ today }}</div></div></div>
   <div class="card stat"><span class="ic w">📝</span><div><div class="l">รอตรวจสอบ</div><div class="n">{{ counts.get('review', 0) }}</div></div></div>
