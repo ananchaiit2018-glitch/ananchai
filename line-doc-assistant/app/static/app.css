@@ -87,10 +87,11 @@ details summary{cursor:pointer;color:var(--blue)}
 .viewer{position:relative}
 .viewer .pages{height:100%;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
 .viewer .pages img{width:100%;height:auto;object-fit:initial;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#fff}
-.viewer .openpdf{position:absolute;right:12px;top:12px;box-shadow:var(--shadow)}
+.viewer .openpdf{position:absolute;right:12px;top:12px}.viewer .openpdf .btn{box-shadow:var(--shadow)}
 @media (max-width:700px){
   .main{padding:14px 12px 96px}
   .actions{position:fixed;left:8px;right:8px;bottom:8px;z-index:20;flex-wrap:nowrap;gap:6px;padding:8px}
   .actions .btn{flex:1;padding:8px 4px;font-size:.92rem;min-width:0}
 }
-@media (max-width:700px){.hide-sm{display:none}}
+.show-sm{display:none}
+@media (max-width:700px){.hide-sm{display:none}.show-sm{display:inline}}

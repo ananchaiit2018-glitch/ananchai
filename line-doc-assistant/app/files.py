@@ -88,6 +88,31 @@ def validate(data: bytes, max_mb: int, max_pages: int) -> tuple[str, int]:
     return kind, pages
 
 
+A4_DPI = 250
+A4_PX = (round(8.27 * A4_DPI), round(11.69 * A4_DPI))   # 2068 x 2922
+
+
+def image_to_pdf(path: Path) -> bytes:
+    """แปลงรูปเป็น PDF ขนาด A4 พร้อมพิมพ์ — หมุนตาม EXIF, ย่อ/ขยายให้เต็มหน้า (LINE มักย่อรูป), กึ่งกลางพื้นขาว
+    รูปแนวนอนใช้หน้า A4 แนวนอน"""
+    from PIL import Image, ImageOps
+    with Image.open(path) as im:
+        im = ImageOps.exif_transpose(im)
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA"); bg = Image.new("RGB", im.size, "white"); bg.paste(im, mask=im.split()[-1]); im = bg
+        else:
+            im = im.convert("RGB")
+        pw, ph = A4_PX if im.height >= im.width else A4_PX[::-1]
+        scale = min(pw / im.width, ph / im.height)
+        if abs(scale - 1) > 0.01:
+            im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
+        page = Image.new("RGB", (pw, ph), "white")
+        page.paste(im, ((pw - im.width) // 2, (ph - im.height) // 2))
+        buf = io.BytesIO()
+        page.save(buf, "PDF", resolution=A4_DPI, quality=88)
+        return buf.getvalue()
+
+
 def store(files_dir: Path, job_id: str, data: bytes, kind: str, pages: int) -> StoredFile:
     """เก็บด้วยชื่อที่ระบบสร้าง: files/<job_id>/<sha256>.<ext> — เขียนไฟล์ชั่วคราวแล้วค่อยเปลี่ยนชื่อ"""
     digest = sha256_bytes(data)

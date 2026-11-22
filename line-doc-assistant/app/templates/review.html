@@ -10,7 +10,7 @@
   <div class="viewer">
     {% if j.stored_path and not j.file_purged %}
       {% if j.file_type == 'pdf' %}<div class="pages">{% for n in range(1, pages + 1) %}<img src="/review/{{ j.id }}/page/{{ n }}.png" alt="หน้า {{ n }}" loading="lazy">{% endfor %}</div>
-        <a class="btn sm openpdf" href="/review/{{ j.id }}/file" target="_blank">เปิดไฟล์ PDF ต้นฉบับ</a>
+        <span class="openpdf row" style="gap:6px">{% if j.orig_path %}<a class="btn sm" href="/review/{{ j.id }}/original" target="_blank">ดูรูปที่ส่งมา</a>{% endif %}<a class="btn sm" href="/review/{{ j.id }}/file" target="_blank">{{ 'เปิด PDF (แปลงจากรูป)' if j.orig_path else 'เปิดไฟล์ PDF ต้นฉบับ' }}</a></span>
       {% else %}<img src="/review/{{ j.id }}/file" alt="ไฟล์ต้นฉบับ">{% endif %}
     {% elif j.file_purged %}<p style="color:#fff;padding:20px">ลบสำเนาบนเซิร์ฟเวอร์แล้ว (คอมสำนักงานเก็บไว้ที่ {{ j.office_path }})</p>
     {% else %}<p style="color:#fff;padding:20px">กำลังรับไฟล์…</p>{% endif %}
@@ -44,7 +44,7 @@
       {% if editable %}
       <div class="actions">
         <button class="btn green" type="button" onclick="go('confirm')">✓ ยืนยัน</button>
-        <button class="btn blue" type="button" onclick="go('save')">✎ <span class="hide-sm">บันทึก</span>แก้ไข</button>
+        <button class="btn blue" type="button" onclick="go('save')"><span class="hide-sm">✎ บันทึกการแก้ไข</span><span class="show-sm">✎ แก้ไข</span></button>
         <span class="grow hide-sm"></span>
         <button class="btn red" type="button" onclick="go('cancel')">✕ ยกเลิก</button>
       </div>

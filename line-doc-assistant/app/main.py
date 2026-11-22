@@ -245,6 +245,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         mime = {"pdf": "application/pdf", "jpg": "image/jpeg", "png": "image/png"}.get(j["file_type"], "application/octet-stream")
         return FileResponse(j["stored_path"], media_type=mime, headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"})
 
+    @app.get("/review/{jid}/original")
+    def review_original(jid: str, request: Request):
+        """รูปต้นฉบับที่ส่งมาทาง LINE (กรณีระบบแปลงเป็น PDF แล้ว)"""
+        need(request)
+        j = db.one("SELECT * FROM jobs WHERE id=?", jid)
+        if not j or not j["orig_path"] or j["file_purged"] or not Path(j["orig_path"]).exists():
+            raise HTTPException(404, "ไม่มีไฟล์")
+        mime = "image/png" if j["orig_path"].endswith(".png") else "image/jpeg"
+        return FileResponse(j["orig_path"], media_type=mime, headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"})
+
     @app.get("/review/{jid}/page/{n}.png")
     def review_page_png(jid: str, n: int, request: Request):
         """ภาพหน้าเอกสาร PDF สำหรับดูบนมือถือ/เบราว์เซอร์ใน LINE (ซึ่งมักแสดง PDF ในหน้าเว็บไม่ได้)"""
@@ -359,8 +369,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.backup_to(dest)
         import sqlite3
         ok = sqlite3.connect(str(dest)).execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        bad = [j["id"] for j in db.q("SELECT id, stored_path, sha256 FROM jobs WHERE file_purged=0 AND stored_path<>''")
-               if not Path(j["stored_path"]).exists() or sha256_file(j["stored_path"]) != j["sha256"]]
+        bad = [j["id"] for j in db.q("SELECT id, stored_path, sha256, orig_path, orig_sha256 FROM jobs WHERE file_purged=0 AND stored_path<>''")
+               if not Path(j["stored_path"]).exists() or sha256_file(j["stored_path"]) != j["sha256"]
+               or (j["orig_path"] and (not Path(j["orig_path"]).exists() or sha256_file(j["orig_path"]) != j["orig_sha256"]))]
         db.audit("backup", u["username"], "", {"file": dest.name, "integrity": ok, "bad_files": bad})
         flash(request, f"สำรองข้อมูลแล้ว: {dest.name} · ตรวจฐานข้อมูล {'ผ่าน' if ok else 'ไม่ผ่าน'} · ไฟล์เอกสารเสีย/หาย {len(bad)} ไฟล์", "ok" if ok and not bad else "err")
         return RedirectResponse("/settings/system", 303)

@@ -62,10 +62,42 @@ def test_scanned_image_is_ocr_and_unclear_fields_flagged(env):
     send_file(env, FIX / "memo-scan.png", as_image=True)
     env["svc"].drain()
     j = env["db"].one("SELECT * FROM jobs")
-    assert j["status"] == "review" and j["ocr_method"] == "image-ocr" and j["file_type"] == "png"
+    assert j["status"] == "review" and j["ocr_method"] == "image-ocr" and j["file_type"] == "pdf"
     f = json.loads(j["extracted_json"])
     for k, v in f.items():               # ทุกช่อง: มีค่าที่อ่านชัด หรือถูกทำเครื่องหมาย "กรุณาตรวจสอบ" (ไม่มีการเดา)
         assert (v["value"] and not v["check"]) or (v["check"] and "กรุณาตรวจสอบ" in v["note"]), (k, v)
+
+
+def test_image_is_converted_to_a4_pdf_and_original_kept(env):
+    import pypdfium2 as pdfium
+    from app.security import sha256_file
+    send_file(env, FIX / "memo-scan.png", as_image=True)
+    env["svc"].drain()
+    j = env["db"].one("SELECT * FROM jobs")
+    assert j["file_name"].endswith(".pdf") and j["stored_path"].endswith(".pdf")
+    assert sha256_file(j["stored_path"]) == j["sha256"]
+    assert Path(j["orig_path"]).exists() and sha256_file(j["orig_path"]) == j["orig_sha256"] != j["sha256"]
+    doc = pdfium.PdfDocument(j["stored_path"])
+    w, h = doc[0].get_size(); doc.close()
+    assert abs(w - 595) < 3 and abs(h - 842) < 3                  # A4 แนวตั้ง (หน่วย pt)
+    # คอมสำนักงานได้ PDF
+    env["svc"].confirm(j["id"], _confirm_values(), "admin")
+    _agent(env).run_once()
+    j = env["db"].one("SELECT * FROM jobs")
+    assert j["status"] == "done" and j["office_path"].endswith(".pdf") and j["office_sha256"] == j["sha256"]
+    # ลบสำเนาบนเซิร์ฟเวอร์: ลบทั้ง PDF และรูปต้นฉบับ
+    assert env["svc"].purge_files(older_than_days=0) == 1
+    assert not Path(j["stored_path"]).exists() and not Path(j["orig_path"]).exists()
+
+
+def test_landscape_photo_gets_landscape_page(tmp_path):
+    import pypdfium2 as pdfium
+    from PIL import Image
+    from app.files import image_to_pdf
+    p = tmp_path / "wide.jpg"; Image.new("RGB", (3000, 1500), "gray").save(p)
+    out = tmp_path / "o.pdf"; out.write_bytes(image_to_pdf(p))
+    doc = pdfium.PdfDocument(str(out)); w, h = doc[0].get_size(); doc.close()
+    assert w > h
 
 
 def test_duplicate_line_delivery_creates_one_job(env):

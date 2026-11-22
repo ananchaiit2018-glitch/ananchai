@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   reg_label TEXT NOT NULL DEFAULT '',
   result_message TEXT NOT NULL DEFAULT '',
   finished_at TEXT NOT NULL DEFAULT '',
-  file_purged INTEGER NOT NULL DEFAULT 0
+  file_purged INTEGER NOT NULL DEFAULT 0,
+  orig_path TEXT NOT NULL DEFAULT '',             -- รูปต้นฉบับ (ถ้าแปลงเป็น PDF)
+  orig_sha256 TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status, created_at);
 CREATE TABLE IF NOT EXISTS audit (
@@ -100,6 +102,10 @@ class DB:
         self.conn.execute("PRAGMA synchronous=FULL")
         self.conn.execute("PRAGMA busy_timeout=10000")
         self.conn.executescript(SCHEMA)
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(jobs)")}
+        for c in ("orig_path", "orig_sha256"):      # อัปเดตจากเวอร์ชันเก่า: เพิ่มคอลัมน์ ไม่แตะข้อมูลเดิม
+            if c not in cols:
+                self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {c} TEXT NOT NULL DEFAULT ''")
 
     def q(self, sql: str, *args) -> list[sqlite3.Row]:
         with self._lock:

@@ -27,7 +27,8 @@ STATUS_TH = {"received": "รับเอกสารแล้ว", "reading": "
 FILE_EXT = (".pdf", ".jpg", ".jpeg", ".png")
 AUDIT_TH = {"received": "รับเอกสารจาก LINE", "stored": "เก็บไฟล์ (ตรวจ sha256)", "read": "อ่านข้อมูลเสร็จ", "rejected": "ไม่รับไฟล์", "edited": "แก้ไขข้อมูล",
             "confirmed": "ยืนยันข้อมูล", "cancelled": "ยกเลิก", "claimed": "คอมสำนักงานรับงาน", "done": "บันทึกลงทะเบียนสำเร็จ", "failed": "บันทึกไม่สำเร็จ",
-            "done_manual": "ยืนยันผลด้วยตนเอง", "requeued": "ส่งให้คอมสำนักงานอีกครั้ง", "purged": "ลบสำเนาบนเซิร์ฟเวอร์", "process_error": "ขัดข้องระหว่างอ่าน"}
+            "done_manual": "ยืนยันผลด้วยตนเอง", "requeued": "ส่งให้คอมสำนักงานอีกครั้ง", "purged": "ลบสำเนาบนเซิร์ฟเวอร์", "process_error": "ขัดข้องระหว่างอ่าน",
+            "to_pdf": "แปลงรูปเป็น PDF (A4)", "pdf_failed": "แปลงเป็น PDF ไม่ได้ ใช้รูปเดิม"}
 
 
 class JobError(Exception):
@@ -120,12 +121,27 @@ class Service:
         self.db.run("UPDATE jobs SET status='reading', file_type=?, file_size=?, sha256=?, stored_path=?, file_name=?, updated_at=? WHERE id=?",
                     kind, sf.size, sf.sha256, str(sf.path), name, now(), jid)
         self.db.audit("stored", "ระบบ", jid, {"sha256": sf.sha256, "size": sf.size, "pages": pages})
-        res = read_document(sf.path, kind, self.s.tesseract_cmd)
+        res = read_document(sf.path, kind, self.s.tesseract_cmd)      # OCR จากไฟล์ต้นฉบับ (รูปเต็มความละเอียด)
+        if kind != "pdf":
+            self._convert_to_pdf(jid, sf, name)
         fields = ex.extract(res.lines, from_image=res.method != "pdf-text")
         self.db.run("UPDATE jobs SET status='review', ocr_method=?, ocr_text=?, extracted_json=?, updated_at=? WHERE id=?",
                     res.method, res.text[:20000], json.dumps(fields, ensure_ascii=False), now(), jid)
         self.db.audit("read", "ระบบ", jid, {"method": res.method, "error": res.error, "check": [k for k, v in fields.items() if v["check"]]})
         self.line.push(uid, f"{MSG_READ_DONE}\n{self.s.public_base_url}/review/{jid}")
+
+    def _convert_to_pdf(self, jid: str, sf, name: str) -> None:
+        """รูป → PDF A4 สำหรับพิมพ์ ไฟล์ที่ส่งไปคอมสำนักงานคือ PDF; รูปต้นฉบับเก็บไว้คู่กันจนกว่าจะลบตามรอบ
+        ถ้าแปลงไม่ได้ ใช้รูปเดิมต่อไป (ไม่ทำให้งานล้ม)"""
+        try:
+            pdf = fl.store(self.s.files_dir, jid, fl.image_to_pdf(sf.path), "pdf", 1)
+        except Exception as e:  # noqa: BLE001
+            self.db.audit("pdf_failed", "ระบบ", jid, f"แปลงเป็น PDF ไม่ได้ ใช้รูปเดิม: {e}")
+            return
+        pdf_name = name.rsplit(".", 1)[0] + ".pdf"
+        self.db.run("UPDATE jobs SET file_type='pdf', file_size=?, sha256=?, stored_path=?, file_name=?, orig_path=?, orig_sha256=?, updated_at=? WHERE id=?",
+                    pdf.size, pdf.sha256, str(pdf.path), pdf_name, str(sf.path), sf.sha256, now(), jid)
+        self.db.audit("to_pdf", "ระบบ", jid, {"sha256": pdf.sha256, "size": pdf.size, "from": sf.sha256})
 
     # ---------- ตรวจสอบ / แก้ไข / ยืนยัน / ยกเลิก ----------
     def _clean_values(self, values: dict) -> dict:
@@ -228,10 +244,12 @@ class Service:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
         n = 0
         for j in self.db.q("SELECT * FROM jobs WHERE status='done' AND file_purged=0 AND office_sha256<>'' AND office_sha256=sha256 AND finished_at<=?", cutoff):
+            import shutil
             from pathlib import Path
-            p = Path(j["stored_path"])
-            if p.exists() and str(p.resolve()).startswith(str(self.s.files_dir.resolve())):
-                p.unlink()
+            root = self.s.files_dir.resolve()
+            d = Path(j["stored_path"]).resolve().parent
+            if d.parent == root and d.name == j["id"]:        # ลบเฉพาะโฟลเดอร์ของงานนี้ (PDF + รูปต้นฉบับ + ภาพตัวอย่าง)
+                shutil.rmtree(d, ignore_errors=True)
             self.db.run("UPDATE jobs SET file_purged=1 WHERE id=?", j["id"])
             self.db.audit("purged", "ระบบ", j["id"], "ลบสำเนาบนเซิร์ฟเวอร์ (คอมสำนักงานเก็บแล้ว ตรวจ sha256 ตรงกัน)")
             n += 1
