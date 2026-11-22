@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>ตั้งค่าระบบ</h1><div class="sub">ผู้ตรวจสอบ ความปลอดภัย การเก็บไฟล์ และการสำรองข้อมูล</div></div></div>
+<div class="grid g2">
+  <div class="card"><h2>ผู้ใช้ Dashboard (ผู้มีสิทธิ์ตรวจสอบ/ยืนยัน)</h2>
+    <table class="t"><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ</th><th>ผู้เข้าเวรในเว็บทะเบียน</th><th>สิทธิ์</th></tr></thead><tbody>
+    {% for u in users %}<tr><td>{{ u.username }}</td><td>{{ u.display_name }}</td><td>{{ u.officer_name or '-' }}</td><td>{{ 'ผู้ดูแลระบบ' if u.role == 'admin' else 'ผู้ตรวจสอบ' }}</td></tr>{% endfor %}</tbody></table>
+    {% if me.role == 'admin' %}<details style="margin-top:12px"><summary>เพิ่มผู้ใช้</summary>
+    <form method="post" action="/settings/system/users" style="margin-top:10px">
+      <div class="grid g2"><div class="field"><label class="f">ชื่อผู้ใช้</label><input type="text" name="username" required></div>
+      <div class="field"><label class="f">รหัสผ่าน <small>(อย่างน้อย 8 ตัว)</small></label><input type="password" name="password" autocomplete="new-password" required></div>
+      <div class="field"><label class="f">ชื่อที่แสดง</label><input type="text" name="display_name"></div>
+      <div class="field"><label class="f">ชื่อผู้เข้าเวรในเว็บทะเบียน</label><input type="text" name="officer_name" placeholder="ต้องตรงกับรายชื่อในเว็บทะเบียนเดิม"></div></div>
+      <div class="row"><label><input type="radio" name="role" value="reviewer" checked> ผู้ตรวจสอบ</label><label><input type="radio" name="role" value="admin"> ผู้ดูแลระบบ</label>
+      <span class="grow"></span><button class="btn green">เพิ่มผู้ใช้</button></div></form></details>{% endif %}
+  </div>
+  <div class="card"><h2>ค่าที่ใช้อยู่</h2>
+    <p>ขนาดไฟล์สูงสุด: <b>{{ s.max_file_mb }} MB</b> · PDF สูงสุด <b>{{ s.max_pdf_pages }}</b> หน้า<br>
+       เก็บสำเนาบนเซิร์ฟเวอร์หลังคอมสำนักงานเก็บสำเร็จ: <b>{{ s.retention_days }} วัน</b><br>
+       โฟลเดอร์ข้อมูล: <code class="k">{{ s.data_dir }}</code><br>
+       OCR: <b>Tesseract (ในเครื่อง)</b> ภาษาไทย</p>
+    <div class="notice warn" style="margin-bottom:0"><b>Claude API (AI ภายนอก): ปิดอยู่</b><br>ระบบอ่านเอกสารในเครื่องทั้งหมด ไม่ส่งเอกสารราชการออกไปภายนอก ยังไม่มีส่วนเชื่อมต่อ AI — จะเพิ่มเมื่อผู้ดูแลอนุมัติและยอมรับค่าใช้จ่ายเท่านั้น</div>
+    <p class="muted" style="font-size:.9rem">ค่าเหล่านี้แก้ในไฟล์ <code>.env</code> แล้วเปิดโปรแกรมใหม่</p>
+  </div>
+</div>
+<div class="card"><h2>สำรองข้อมูลและตรวจความสมบูรณ์</h2>
+  <p>สำรองฐานข้อมูลคิวงาน/ประวัติ แล้วตรวจ <b>integrity</b> และตรวจ <b>sha256</b> ของไฟล์เอกสารที่ยังเก็บอยู่ทุกไฟล์</p>
+  <form method="post" action="/settings/system/backup"><button class="btn blue" {{ '' if me.role == 'admin' else 'disabled' }}>สำรองและตรวจตอนนี้</button></form>
+</div>
+{% endblock %}

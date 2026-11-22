@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>ประวัติการรับเอกสาร</h1><div class="sub">ทุกเอกสารที่ส่งเข้ามา พร้อมผู้ส่ง ผู้ยืนยัน และผลการบันทึก</div></div></div>
+<form class="card row" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="ค้นหา ชื่อไฟล์ ผู้ส่ง เลขที่หนังสือ เลขทะเบียน" class="grow" style="max-width:480px">
+  <select name="status" style="width:240px"><option value="">ทุกสถานะ</option>{% for k, v in STATUS_TH.items() %}<option value="{{ k }}" {{ 'selected' if status == k }}>{{ v }}</option>{% endfor %}</select>
+  <button class="btn blue">ค้นหา</button></form>
+<div class="card">
+{% if rows %}<table class="t"><thead><tr><th>เวลารับ</th><th>ผู้ส่ง</th><th>ไฟล์</th><th>เลขที่หนังสือ</th><th>ยืนยันโดย</th><th>สถานะ / เลขทะเบียน</th><th></th></tr></thead><tbody>
+{% for j in rows %}<tr><td>{{ j.created_at|thai_time }}</td><td>{{ j.sender_name or '-' }}</td><td>{{ j.file_name }}<br><small class="muted">sha256 {{ j.sha256[:12] }}…</small></td>
+  <td>{{ j.final.get('book_no') or j.extracted.get('book_no', {}).get('value') or '-' }}</td>
+  <td>{{ j.confirmed_by or '-' }}<br><small class="muted">{{ j.confirmed_at|thai_time }}</small></td>
+  <td><span class="st st-{{ j.status }}">{{ STATUS_TH[j.status] }}</span>{% if j.reg_label %}<br><b>{{ j.reg_label }}</b>{% endif %}</td>
+  <td><a class="btn sm" href="/review/{{ j.id }}">เปิด</a></td></tr>{% endfor %}</tbody></table>
+{% else %}<p class="muted">ไม่พบรายการ</p>{% endif %}
+</div>
+{% endblock %}

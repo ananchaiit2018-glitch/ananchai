@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>🧪 จำลองส่งเอกสารจาก LINE</h1><div class="sub">ทดลองทั้งระบบโดยไม่ต้องมี LINE จริง — ผ่านการตรวจลายเซ็นและสิทธิ์เหมือนของจริง</div></div></div>
+<div class="grid g2">
+  <form class="card" method="post" action="/demo/send" enctype="multipart/form-data"><h2>ส่งไฟล์ในนามผู้ใช้ LINE</h2>
+    {% if users %}
+    <div class="field"><label class="f">ผู้ส่ง (LINE)</label><select name="line_user_id">{% for u in users %}<option value="{{ u.line_user_id }}">{{ u.display_name }}</option>{% endfor %}
+      <option value="Uffffffffffffffffffffffffffffffff">ผู้ไม่มีสิทธิ์ (ทดสอบการปฏิเสธ)</option></select></div>
+    <div class="field"><label class="f">ไฟล์เอกสาร <small>(PDF, JPG, PNG)</small></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required></div>
+    <button class="btn green">ส่งเหมือนส่งในแชท LINE</button>
+    {% else %}<div class="notice warn">ยังไม่มีผู้มีสิทธิ์ส่งเอกสาร — เพิ่มที่ <a href="/settings/line">ตั้งค่า LINE</a> ก่อน (ใช้รหัสจำลองเช่น U + เลข 32 ตัว)</div>{% endif %}
+  </form>
+  <div class="card"><h2>ข้อความที่ระบบตอบกลับทาง LINE</h2>
+    {% for o in outbox %}<div style="border-bottom:1px solid var(--line);padding:6px 0"><span class="chip">{{ o.kind }}</span> <small class="muted">{{ o.at|thai_time }}</small><div style="white-space:pre-wrap">{{ o.text }}</div></div>
+    {% else %}<p class="muted">ยังไม่มี</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

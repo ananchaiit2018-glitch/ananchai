@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>ภาพรวม</h1><div class="sub">LINE → อ่านเอกสาร → เจ้าหน้าที่ตรวจสอบ → ยืนยัน → คอมสำนักงานบันทึกลงทะเบียน → แจ้ง LINE</div></div></div>
+<div class="grid g4">
+  <div class="card stat"><span class="ic b">📥</span><div><div class="l">รับเอกสารวันนี้</div><div class="n">{{ today }}</div></div></div>
+  <div class="card stat"><span class="ic w">📝</span><div><div class="l">รอตรวจสอบ</div><div class="n">{{ counts.get('review', 0) }}</div></div></div>
+  <div class="card stat"><span class="ic g">🖥️</span><div><div class="l">ยืนยันแล้ว รอคอมสำนักงาน</div><div class="n">{{ counts.get('confirmed', 0) + counts.get('processing', 0) }}</div></div></div>
+  <div class="card stat"><span class="ic r">⚠️</span><div><div class="l">บันทึกไม่สำเร็จ / ค้าง</div><div class="n">{{ counts.get('failed', 0) + stuck }}</div></div></div>
+</div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h2>คอมสำนักงาน</h2>
+    {% for a in agents %}<div class="row" style="margin-bottom:6px"><span class="dot {{ 'on' if a.online else 'off' }}"></span><b>{{ a.agent_id }}</b><span class="muted">{{ 'เชื่อมต่ออยู่' if a.online else 'ขาดการติดต่อ' }} · ล่าสุด {{ a.last_seen|thai_time }}</span></div>
+    {% else %}<p class="muted">ยังไม่มีคอมสำนักงานเชื่อมต่อ — ดูวิธีเปิดตัวรับงานที่เมนู "สถานะการเชื่อมต่อคอมสำนักงาน"</p>{% endfor %}
+  </div>
+  <div class="card"><h2>สถานะทั้งหมด</h2>
+    <div class="row">{% for k, v in STATUS_TH.items() %}{% if counts.get(k) %}<span class="st st-{{ k }}">{{ v }} {{ counts.get(k) }}</span>{% endif %}{% endfor %}
+    {% if not counts %}<span class="muted">ยังไม่มีเอกสาร</span>{% endif %}</div>
+  </div>
+</div>
+<div class="card"><h2>เอกสารล่าสุด</h2>
+  {% if recent %}<table class="t"><thead><tr><th>เวลารับ</th><th>ผู้ส่ง (LINE)</th><th>ไฟล์</th><th>เลขที่หนังสือ</th><th>สถานะ</th><th></th></tr></thead><tbody>
+  {% for j in recent %}<tr><td>{{ j.created_at|thai_time }}</td><td>{{ j.sender_name or '-' }}</td><td>{{ j.file_name }}</td>
+    <td>{{ j.final.book_no or j.extracted.get('book_no', {}).get('value', '') or '-' }}</td><td><span class="st st-{{ j.status }}">{{ STATUS_TH[j.status] }}</span>{% if j.reg_label %} <b>{{ j.reg_label }}</b>{% endif %}</td>
+    <td><a class="btn sm" href="/review/{{ j.id }}">เปิด</a></td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="muted">ยังไม่มีเอกสาร{% if demo %} — ลองที่เมนู "🧪 จำลองส่งจาก LINE"{% endif %}</p>{% endif %}
+</div>
+{% endblock %}

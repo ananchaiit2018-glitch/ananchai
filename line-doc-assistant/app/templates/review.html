@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block body %}
+{% set ex = j.extracted %}{% set fin = draft or j.final %}{% set editable = j.status == 'review' %}
+<div class="top"><div><h1>ตรวจสอบเอกสาร</h1>
+  <div class="sub">{{ j.file_name }} · ส่งโดย {{ j.sender_name or '-' }} · {{ j.created_at|thai_time }} · <span class="st st-{{ j.status }}">{{ STATUS_TH[j.status] }}</span>
+  {% if j.reg_label %} · เลขทะเบียน <b>{{ j.reg_label }}</b>{% endif %}</div></div>
+  <a class="btn" href="/review">← กลับรายการ</a></div>
+
+<div class="split">
+  <div class="viewer">
+    {% if j.stored_path and not j.file_purged %}
+      {% if j.file_type == 'pdf' %}<div class="pages">{% for n in range(1, pages + 1) %}<img src="/review/{{ j.id }}/page/{{ n }}.png" alt="หน้า {{ n }}" loading="lazy">{% endfor %}</div>
+        <a class="btn sm openpdf" href="/review/{{ j.id }}/file" target="_blank">เปิดไฟล์ PDF ต้นฉบับ</a>
+      {% else %}<img src="/review/{{ j.id }}/file" alt="ไฟล์ต้นฉบับ">{% endif %}
+    {% elif j.file_purged %}<p style="color:#fff;padding:20px">ลบสำเนาบนเซิร์ฟเวอร์แล้ว (คอมสำนักงานเก็บไว้ที่ {{ j.office_path }})</p>
+    {% else %}<p style="color:#fff;padding:20px">กำลังรับไฟล์…</p>{% endif %}
+  </div>
+  <div>
+    {% if j.status in ('received', 'reading') %}<div class="notice warn">กำลังอ่านข้อมูล… รีเฟรชหน้านี้อีกครั้งในไม่กี่วินาที</div>{% endif %}
+    {% if j.status == 'rejected' %}<div class="notice err">ไม่รับไฟล์: {{ j.result_message }}</div>{% endif %}
+    {% if j.ocr_method %}<div class="notice {{ 'ok' if j.ocr_method == 'pdf-text' else 'warn' }}">
+      {{ {'pdf-text':'อ่านจากตัวอักษรใน PDF โดยตรง (ตรงตามต้นฉบับ)','pdf-ocr':'อ่านจากภาพของหน้า PDF ด้วย OCR — ตรวจตัวเลขให้ดี','image-ocr':'อ่านจากรูปด้วย OCR — ตรวจตัวเลขให้ดี','failed':'อ่านข้อมูลไม่ได้ — กรุณากรอกเองทุกช่อง'}[j.ocr_method] }}</div>{% endif %}
+
+    <form class="card" method="post" action="/review/{{ j.id }}" id="rf">
+      <div class="field"><label class="f">ประเภท</label><div class="row">
+        <label><input type="radio" name="kind" value="in" {{ 'checked' if (fin.get('kind') or 'in') == 'in' }} {{ '' if editable else 'disabled' }}> หนังสือรับ</label>
+        <label><input type="radio" name="kind" value="out" {{ 'checked' if fin.get('kind') == 'out' }} {{ '' if editable else 'disabled' }}> หนังสือส่ง</label></div></div>
+      {% for k in ['book_no', 'book_date', 'sender', 'receiver', 'subject'] %}
+        {% set e = ex.get(k, {}) %}{% set v = fin.get(k) if k in fin else e.get('value', '') %}
+        <div class="field {{ 'check' if e.get('check', true) and editable and not (k in fin) }}">
+          <label class="f">{{ FIELDS[k] }}{% if k == 'subject' %} <small>(ระบบทะเบียนเดิมบังคับกรอก)</small>{% endif %}
+            {% if e.get('check', true) %}<span class="flag">{{ e.get('note') or 'กรุณาตรวจสอบ' }}</span>{% elif e.get('value') %}<span class="okflag">อ่านได้ {{ e.get('conf', 0)|round|int }}%</span>{% endif %}</label>
+          {% if k == 'book_date' %}<input type="date" name="book_date" value="{{ v }}" {{ '' if editable else 'readonly' }}>
+            {% if e.get('display') %}<small class="muted">ในเอกสาร: {{ e.get('display') }}</small>{% endif %}
+          {% elif k == 'subject' %}<textarea name="subject" rows="2" {{ '' if editable else 'readonly' }}>{{ v }}</textarea>
+          {% else %}<input type="text" name="{{ k }}" value="{{ v }}" {{ '' if editable else 'readonly' }}>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="grid g2">
+        <div class="field"><label class="f">ผู้บันทึก <small>(ผู้เข้าเวรในเว็บทะเบียนเดิม)</small></label>
+          <select name="officer" {{ '' if editable else 'disabled' }}><option value="">— เลือก —</option>
+          {% for o in officers %}<option {{ 'selected' if (fin.get('officer') or me.officer_name) == o }}>{{ o }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="f">หมายเหตุ</label><input type="text" name="remark" value="{{ fin.get('remark', '') }}" {{ '' if editable else 'readonly' }}></div>
+      </div>
+      <input type="hidden" name="reason" id="reason"><input type="hidden" name="action" id="act">
+      {% if editable %}
+      <div class="actions">
+        <button class="btn green" type="button" onclick="go('confirm')">✓ ยืนยัน</button>
+        <button class="btn blue" type="button" onclick="go('save')">✎ บันทึกการแก้ไข</button>
+        <span class="grow"></span>
+        <button class="btn red" type="button" onclick="go('cancel')">✕ ยกเลิก</button>
+      </div>
+      <p class="muted" style="font-size:.88rem;margin:8px 0 0">กด "ยืนยัน" แล้ว คอมสำนักงานจะนำข้อมูลนี้ไปกรอกในเว็บทะเบียนเดิม — ยังไม่บันทึกจนกว่าจะยืนยัน</p>
+      {% endif %}
+    </form>
+
+    {% if j.status in ('failed', 'processing') %}
+    <div class="card"><h2>แก้ปัญหา (ระบบไม่ส่งซ้ำเอง)</h2>
+      {% if j.result_message %}<div class="notice err">{{ j.result_message }}</div>{% endif %}
+      <p class="muted">ตรวจที่เว็บทะเบียนในคอมสำนักงานก่อน ว่ารายการนี้ถูกบันทึกไปแล้วหรือยัง</p>
+      <form method="post" action="/review/{{ j.id }}" class="row" style="margin-bottom:10px"><input type="hidden" name="action" value="done_manual">
+        <input type="text" name="reg_label" placeholder="เลขทะเบียนที่เห็นในเว็บ เช่น 015/2570" style="max-width:260px"><button class="btn green">บันทึกแล้ว — ใส่เลขทะเบียน</button></form>
+      <form method="post" action="/review/{{ j.id }}" class="row"><input type="hidden" name="action" value="requeue">
+        <label><input type="checkbox" name="checked" value="1"> ตรวจแล้ว ยังไม่ได้บันทึกในเว็บทะเบียน</label><button class="btn">ส่งให้คอมสำนักงานอีกครั้ง</button></form>
+    </div>{% endif %}
+
+    <div class="card"><h2>ประวัติรายการนี้</h2><ul class="timeline">
+      {% for a in log %}<li><b>{{ AUDIT_TH.get(a.action, a.action) }}</b> <span class="muted">{{ a.at|thai_time }} · {{ (j.sender_name or 'ผู้ส่ง LINE') if a.actor == j.line_user_id else a.actor }}</span></li>{% endfor %}</ul>
+      {% if j.ocr_text %}<details style="margin-top:10px"><summary>ข้อความที่อ่านได้ทั้งหมด</summary><pre style="white-space:pre-wrap;font:inherit;font-size:.9rem">{{ j.ocr_text }}</pre></details>{% endif %}
+    </div>
+  </div>
+</div>
+<script>
+function go(a){
+  if(a==='cancel'){const r=prompt('เหตุผลที่ยกเลิก');if(r===null)return;document.getElementById('reason').value=r;}
+  if(a==='confirm'&&!confirm('ยืนยันข้อมูลนี้ และส่งให้คอมสำนักงานบันทึกลงทะเบียน?'))return;
+  document.getElementById('act').value=a;document.getElementById('rf').submit();
+}
+</script>
+{% endblock %}

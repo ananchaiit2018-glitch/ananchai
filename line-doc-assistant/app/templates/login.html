@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ — ผู้ช่วยรับเอกสาร LINE</title><link rel="stylesheet" href="/static/app.css"></head>
+<body><div class="login"><div class="card">
+  <div class="brand" style="border:0;padding:0 0 10px"><div class="logo">L</div><div><b>ผู้ช่วยรับเอกสาร LINE</b><small>เชื่อมระบบทะเบียนหนังสือ</small></div></div>
+  {% if demo %}<div class="demo-bar">โหมดจำลอง (Demo Mode)</div>{% endif %}
+  {% if error %}<div class="notice err">{{ error }}</div>{% endif %}
+  {% if first %}<div class="notice ok">ยังไม่มีผู้ใช้ — สร้าง<b>ผู้ดูแลระบบคนแรก</b></div>{% endif %}
+  <form method="post" action="/login">
+    <div class="field"><label class="f">ชื่อผู้ใช้</label><input type="text" name="username" autocomplete="username" required autofocus></div>
+    <div class="field"><label class="f">รหัสผ่าน {% if first %}<small>(อย่างน้อย 8 ตัว)</small>{% endif %}</label><input type="password" name="password" autocomplete="{{ 'new-password' if first else 'current-password' }}" required></div>
+    {% if first %}
+    <div class="field"><label class="f">ชื่อที่แสดง</label><input type="text" name="display_name" placeholder="เช่น ส.ต.ท.อนันต์ชัย"></div>
+    <div class="field"><label class="f">ชื่อผู้เข้าเวรในเว็บทะเบียนเดิม <small>(ใช้เลือกผู้บันทึก)</small></label><input type="text" name="officer_name" placeholder="เช่น ส.ต.ท.อนันต์ชัย แก้วหัวไทร"></div>
+    {% endif %}
+    <button class="btn green" style="width:100%">{{ 'สร้างผู้ดูแลระบบและเข้าสู่ระบบ' if first else 'เข้าสู่ระบบ' }}</button>
+  </form>
+</div></div></body></html>

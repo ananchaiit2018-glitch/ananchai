@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>สถานะการเชื่อมต่อคอมสำนักงาน</h1><div class="sub">ตัวรับงานในคอมสำนักงานดึงงานที่ยืนยันแล้วไปกรอกเว็บทะเบียนเดิม · ติดต่อทุก 15 วินาที</div></div></div>
+<div class="grid g3">
+  <div class="card stat"><span class="ic g">🖥️</span><div><div class="l">คอมที่เชื่อมต่ออยู่</div><div class="n">{{ agents|selectattr('online')|list|length }}</div></div></div>
+  <div class="card stat"><span class="ic b">⏳</span><div><div class="l">งานรอคอมสำนักงาน</div><div class="n">{{ waiting }}</div></div></div>
+  <div class="card stat"><span class="ic r">⚠️</span><div><div class="l">ค้างเกิน 15 นาที</div><div class="n">{{ stuck|length }}</div></div></div>
+</div>
+<div class="card" style="margin-top:16px"><h2>เครื่องที่เคยเชื่อมต่อ</h2>
+{% if agents %}<table class="t"><thead><tr><th>เครื่อง</th><th>สถานะ</th><th>ติดต่อล่าสุด</th><th>ข้อมูล</th></tr></thead><tbody>
+{% for a in agents %}<tr><td><b>{{ a.agent_id }}</b></td><td><span class="dot {{ 'on' if a.online else 'off' }}"></span>{{ 'เชื่อมต่ออยู่' if a.online else 'ขาดการติดต่อ' }}</td>
+<td>{{ a.last_seen|thai_time }} <small class="muted">({{ a.age }} วินาทีที่แล้ว)</small></td><td><small class="muted">{{ a.info }}</small></td></tr>{% endfor %}</tbody></table>
+{% else %}<p class="muted">ยังไม่มีคอมสำนักงานเชื่อมต่อ</p>{% endif %}
+</div>
+{% if stuck %}<div class="card"><h2>งานที่ค้าง (ไม่ส่งซ้ำเอง — ต้องตรวจในเว็บทะเบียนก่อน)</h2>
+{% for j in stuck %}<div class="row" style="margin-bottom:6px"><span class="st st-processing">รับงานเมื่อ {{ j.claimed_at|thai_time }}</span>{{ j.file_name }} · เครื่อง {{ j.agent_id }}<a class="btn sm" href="/review/{{ j.id }}">จัดการ</a></div>{% endfor %}</div>{% endif %}
+<div class="card"><h2>วิธีเปิดตัวรับงานที่คอมสำนักงาน</h2>
+  <ol><li>ติดตั้งตามคู่มือ README (หัวข้อ "คอมสำนักงาน")</li>
+  <li>ใส่ค่าในไฟล์ <code>.env</code> ของคอมสำนักงาน: <code class="k">SERVER_URL={{ base }}</code> และ <code class="k">AGENT_TOKEN=…</code></li>
+  <li>ดับเบิลคลิก <code>start-agent.bat</code></li></ol>
+  {% if agent_token %}<details><summary>แสดง AGENT_TOKEN (ผู้ดูแลระบบเท่านั้น — ห้ามส่งในแชท)</summary><p><code class="k">{{ agent_token }}</code></p></details>{% endif %}
+</div>
+{% endblock %}

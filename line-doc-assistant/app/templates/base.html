@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}LINE Smart Document Assistant{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><div class="logo">L</div><div><b>ผู้ช่วยรับเอกสาร LINE</b><small>เชื่อมระบบทะเบียนหนังสือ</small></div></div>
+    <nav class="nav">
+      {% for key, href, label in menu %}
+      <a href="{{ href }}" class="{{ 'on' if active == key else '' }}"><span>{{ label }}</span>
+        {% if key == 'review' and counts.get('review') %}<span class="badge">{{ counts.get('review') }}</span>{% endif %}</a>
+      {% endfor %}
+      {% if demo %}<a href="/demo" class="{{ 'on' if active == 'demo' else '' }}"><span>🧪 จำลองส่งจาก LINE</span></a>{% endif %}
+    </nav>
+    <div class="side-foot">
+      <div><b>{{ me.display_name }}</b> <span class="chip">{{ 'ผู้ดูแลระบบ' if me.role == 'admin' else 'ผู้ตรวจสอบ' }}</span></div>
+      <form method="post" action="/logout" style="margin-top:8px"><button class="btn sm">ออกจากระบบ</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    {% if demo %}<div class="demo-bar">โหมดจำลอง (Demo Mode) — ยังไม่เชื่อม LINE จริง และยังไม่บันทึกลงเว็บทะเบียนจริง</div>{% endif %}
+    {% if flash %}<div class="notice {{ flash[0] }}">{{ flash[1] }}</div>{% endif %}
+    {% block body %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

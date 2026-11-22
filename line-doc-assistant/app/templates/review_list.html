@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="top"><div><h1>เอกสารรอตรวจสอบ</h1><div class="sub">ตรวจข้อมูลกับไฟล์ต้นฉบับ แก้ให้ถูก แล้วกดยืนยัน · รายการที่บันทึกไม่สำเร็จอยู่ในหน้านี้ด้วย</div></div></div>
+<div class="card">
+{% if rows %}<table class="t"><thead><tr><th>เวลารับ</th><th>ผู้ส่ง (LINE)</th><th>ไฟล์</th><th>เลขที่หนังสือ</th><th>ต้องตรวจ</th><th>สถานะ</th><th></th></tr></thead><tbody>
+{% for j in rows %}{% set flagged = j.extracted.values()|selectattr('check')|list %}
+<tr><td>{{ j.created_at|thai_time }}</td><td>{{ j.sender_name or '-' }}</td><td>{{ j.file_name }}</td>
+  <td>{{ j.extracted.get('book_no', {}).get('value') or '-' }}</td>
+  <td>{% if j.status == 'review' %}{% if flagged %}<span class="flag">{{ flagged|length }} ช่อง</span>{% else %}<span class="okflag">อ่านครบ</span>{% endif %}{% endif %}</td>
+  <td><span class="st st-{{ j.status }}">{{ STATUS_TH[j.status] }}</span></td>
+  <td><a class="btn sm {{ 'green' if j.status == 'review' else '' }}" href="/review/{{ j.id }}">{{ 'ตรวจสอบ' if j.status == 'review' else 'เปิด' }}</a></td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="muted">ไม่มีเอกสารรอตรวจสอบ 👍</p>{% endif %}
+</div>
+{% endblock %}
